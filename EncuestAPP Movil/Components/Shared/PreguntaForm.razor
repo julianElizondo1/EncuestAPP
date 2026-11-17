@@ -1,0 +1,249 @@
+@implements IDisposable
+<div class="border rounded-3 bg-light p-3 mt-3">
+    <h4 class="h6 mb-3">@(Pregunta is null ? "Nueva pregunta" : "Editar pregunta")</h4>
+    @if (_error is not null)
+    {
+        <div class="alert alert-danger" role="alert">@_error</div>
+    }
+    @if (Tipos.Count == 0)
+    {
+        <p class="text-secondary mb-0">No se pudo cargar el catálogo de tipos de pregunta.</p>
+    }
+    else if (_creada && !_guardando)
+    {
+        <p class="text-secondary">La pregunta se creó. Si alguna opción no pudo guardarse, podés administrarla desde su bloque de opciones.</p>
+        <button type="button" class="btn btn-outline-secondary" @onclick="OnCancel">Cerrar</button>
+    }
+    else
+    {
+        <EditForm Model="_modelo" OnValidSubmit="GuardarAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+        <fieldset class="app-fieldset" disabled="@_guardando">
+            <div class="mb-3">
+                <label class="form-label" for="@($"{_id}-texto")">Texto de la pregunta</label>
+                <InputText id="@($"{_id}-texto")" class="form-control" maxlength="500" @bind-Value="_modelo.Texto" />
+                <ValidationMessage For="@(() => _modelo.Texto)" />
+            </div>
+            <div class="row g-3">
+                <div class="col-12 col-md-8">
+                    <label class="form-label" for="@($"{_id}-tipo")">Tipo</label>
+                    <InputSelect id="@($"{_id}-tipo")" class="form-select" @bind-Value="_modelo.TipoPreguntaId" @bind-Value:after="TipoCambiado">
+                        @foreach (var tipo in Tipos)
+                        {
+                            <option value="@tipo.Id">@tipo.Nombre</option>
+                        }
+                    </InputSelect>
+                    <ValidationMessage For="@(() => _modelo.TipoPreguntaId)" />
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label" for="@($"{_id}-orden")">Orden</label>
+                    <InputNumber id="@($"{_id}-orden")" class="form-control" min="1" @bind-Value="_modelo.Orden" />
+                    <ValidationMessage For="@(() => _modelo.Orden)" />
+                </div>
+            </div>
+            <div class="form-check my-3">
+                <InputCheckbox id="@($"{_id}-obligatoria")" class="form-check-input" @bind-Value="_modelo.Obligatoria" />
+                <label class="form-check-label" for="@($"{_id}-obligatoria")">Pregunta obligatoria</label>
+            </div>
+            @if (AdmiteOpciones)
+            {
+                @if (Pregunta is null)
+                {
+                    <fieldset class="mb-3">
+                        <legend class="form-label fs-6">Opciones de respuesta</legend>
+                        <p class="small text-secondary">Podés completar las opciones ahora o agregarlas después. Dejá vacías las filas que no uses.</p>
+                        <p class="small text-secondary">Antes de publicar, las preguntas de selección y escala deben tener al menos una opción.</p>
+                        @for (var index = 0; index < _opciones.Count; index++)
+                        {
+                            var opcionIndex = index;
+                            <div class="input-group mb-2">
+                                <label class="input-group-text" for="@($"{_id}-opcion-{opcionIndex}")">@(opcionIndex + 1)</label>
+                                <input id="@($"{_id}-opcion-{opcionIndex}")" class="form-control" maxlength="200" @bind="_opciones[opcionIndex]" />
+                                @if (_opciones.Count > 1)
+                                {
+                                    <button type="button" class="btn btn-outline-danger" aria-label="Quitar fila de opción" @onclick="() => QuitarOpcion(opcionIndex)">Quitar</button>
+                                }
+                            </div>
+                        }
+                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AgregarOpcion">Agregar fila de opción</button>
+                    </fieldset>
+                }
+                else
+                {
+                    <div class="mb-3">
+                        <span class="form-label d-block">Opciones de respuesta</span>
+                        @if (Pregunta.Opciones.Count == 0)
+                        {
+                            <p class="small text-secondary mb-0">Todavía no hay opciones; se administran debajo de esta pregunta.</p>
+                        }
+                        else
+                        {
+                            <ul class="small text-secondary mb-0">
+                                @foreach (var opcion in Pregunta.Opciones.OrderBy(x => x.Orden))
+                                {
+                                    <li>@(opcion.Orden). @opcion.Texto</li>
+                                }
+                            </ul>
+                            <p class="small text-secondary mt-2 mb-0">Las opciones existentes se editan en el bloque de esta pregunta.</p>
+                        }
+                    </div>
+                }
+                @if (NombreTipoActual == "Escala de valoración")
+                {
+                    <p class="small text-secondary">Agregá las opciones de la escala en el orden en que deben mostrarse.</p>
+                }
+            }
+            else if (Pregunta?.Opciones.Count > 0)
+            {
+                <p class="small text-warning">Antes de cambiar a un tipo de texto, eliminá las opciones existentes.</p>
+            }
+            <div class="d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-primary" disabled="@_guardando">
+                    @if (_guardando)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                    }
+                    Guardar pregunta
+                </button>
+                <button type="button" class="btn btn-outline-secondary" @onclick="OnCancel" disabled="@_guardando">Cancelar</button>
+            </div>
+            </fieldset>
+    </EditForm>
+    }
+</div>
+
+@code {
+    [Inject]
+    private IPreguntaService PreguntaService { get; set; } = default!;
+
+    [Parameter]
+    public int EncuestaId { get; set; }
+
+    [Parameter]
+    public PreguntaDto? Pregunta { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<CatalogoDto> Tipos { get; set; } = [];
+
+    [Parameter]
+    public int OrdenInicial { get; set; } = 1;
+
+    [Parameter]
+    public EventCallback OnSaved { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private readonly string _id = $"pregunta-{Guid.NewGuid():N}";
+    private CrearPreguntaDto _modelo = new();
+    private readonly List<string> _opciones = [];
+    private string? _error;
+    private bool _guardando;
+    private bool _descartado;
+    private bool _creada;
+    private (int Encuesta, int Pregunta)? _claveInicializada;
+
+    private string? NombreTipoActual => Tipos.FirstOrDefault(x => x.Id == _modelo.TipoPreguntaId)?.Nombre;
+    private bool AdmiteOpciones => NombreTipoActual is not ("Texto corto" or "Texto largo");
+
+    protected override void OnParametersSet()
+    {
+        var clave = (EncuestaId, Pregunta?.Id ?? 0);
+        if (_claveInicializada == clave)
+        {
+            return;
+        }
+
+        _claveInicializada = clave;
+        _modelo = Pregunta is null
+            ? new CrearPreguntaDto
+            {
+                TipoPreguntaId = Tipos.FirstOrDefault()?.Id ?? 0,
+                Orden = Math.Max(1, OrdenInicial)
+            }
+            : new CrearPreguntaDto
+            {
+                Texto = Pregunta.Texto,
+                TipoPreguntaId = Pregunta.TipoPreguntaId,
+                Orden = Pregunta.Orden,
+                Obligatoria = Pregunta.Obligatoria
+            };
+        _opciones.Clear();
+        if (Pregunta is null)
+        {
+            _opciones.Add(string.Empty);
+        }
+        _error = null;
+        _creada = false;
+    }
+
+    private void TipoCambiado()
+    {
+        if (!AdmiteOpciones)
+        {
+            _opciones.Clear();
+        }
+        else if (Pregunta is null && _opciones.Count == 0)
+        {
+            _opciones.Add(string.Empty);
+        }
+    }
+
+    private void AgregarOpcion() => _opciones.Add(string.Empty);
+
+    private void QuitarOpcion(int index) => _opciones.RemoveAt(index);
+
+    private async Task GuardarAsync()
+    {
+        if (_guardando || _creada || _descartado) return;
+        _error = null;
+        var textosOpciones = AdmiteOpciones
+            ? _opciones.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).ToArray()
+            : [];
+        if (textosOpciones.Any(x => x.Length > 200))
+        {
+            _error = "Cada opción puede tener hasta 200 caracteres.";
+            return;
+        }
+
+        _guardando = true;
+        try
+        {
+            if (Pregunta is not null)
+            {
+                await PreguntaService.ActualizarAsync(Pregunta.Id, new ActualizarPreguntaDto
+                {
+                    Texto = _modelo.Texto,
+                    TipoPreguntaId = _modelo.TipoPreguntaId,
+                    Orden = _modelo.Orden,
+                    Obligatoria = _modelo.Obligatoria
+                });
+                if (!_descartado) await OnSaved.InvokeAsync();
+                if (!_descartado) await OnCancel.InvokeAsync();
+                return;
+            }
+
+            var creada = await PreguntaService.CrearAsync(EncuestaId, _modelo);
+            _creada = true;
+            foreach (var (texto, index) in textosOpciones.Select((texto, index) => (texto, index)))
+            {
+                await PreguntaService.CrearOpcionAsync(creada.Id, new CrearOpcionDto { Texto = texto, Orden = index + 1 });
+            }
+            if (!_descartado) await OnSaved.InvokeAsync();
+            if (!_descartado) await OnCancel.InvokeAsync();
+        }
+        catch (ApiClientException exception)
+        {
+            _error = exception.MensajeConValidaciones;
+            if (!_descartado) await OnSaved.InvokeAsync();
+        }
+        finally
+        {
+            _guardando = false;
+        }
+    }
+
+    public void Dispose() => _descartado = true;
+
+}

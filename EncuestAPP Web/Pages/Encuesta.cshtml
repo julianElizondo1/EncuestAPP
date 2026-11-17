@@ -1,0 +1,179 @@
+@page "/encuesta/{tokenPublico}"
+@model EncuestAPP_Web.Pages.EncuestaModel
+@{
+    ViewData["Title"] = "Encuesta";
+    var preguntas = Model.PreguntasOrdenadas;
+}
+
+<div class="survey-shell">
+    @if (Model.EncuestaEnviada)
+    {
+        <section class="survey-card survey-confirmation text-center" role="status">
+            <div class="confirmation-mark" aria-hidden="true">?</div>
+            <h1>¡Gracias por responder!</h1>
+            <p class="mb-0">Tu participación fue enviada correctamente.</p>
+        </section>
+    }
+    else if (Model.Encuesta is null)
+    {
+        <section class="survey-card" role="alert">
+            <h1>No pudimos abrir la encuesta</h1>
+            <p class="mb-0">@(Model.ErrorGeneral ?? "Verificá el enlace e intentá nuevamente.")</p>
+            <a class="btn btn-outline-primary mt-3" asp-page="/Encuesta" asp-route-tokenPublico="@Model.TokenPublico">Reintentar</a>
+        </section>
+    }
+    else if (!Model.Encuesta.AdmiteRespuestas)
+    {
+        <section class="survey-card" role="status">
+            <span class="survey-eyebrow">Encuesta</span>
+            <h1>@Model.Encuesta.Titulo</h1>
+            <p class="mb-0">Esta encuesta no está disponible para recibir respuestas.</p>
+        </section>
+    }
+    else
+    {
+        <header class="survey-card survey-header">
+            <span class="survey-eyebrow">Encuesta</span>
+            <h1>@Model.Encuesta.Titulo</h1>
+            @if (!string.IsNullOrWhiteSpace(Model.Encuesta.Descripcion))
+            {
+                <p class="survey-description">@Model.Encuesta.Descripcion</p>
+            }
+            @if (Model.Encuesta.EsAnonima)
+            {
+                <p class="survey-notice">Esta encuesta está configurada como anónima.</p>
+            }
+            @if (Model.Encuesta.UnaRespuestaPorDispositivo)
+            {
+                <p class="survey-notice">Para limitar a una respuesta, este navegador guardará un código aleatorio usado únicamente para esta encuesta.</p>
+            }
+            <p class="survey-required-note"><span aria-hidden="true">*</span> Pregunta obligatoria</p>
+        </header>
+
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorGeneral))
+        {
+            <div class="alert alert-danger" role="alert">@Model.ErrorGeneral</div>
+        }
+
+        <form id="survey-form" method="post" asp-route-tokenPublico="@Model.TokenPublico">
+            @for (var index = 0; index < preguntas.Count; index++)
+            {
+                var pregunta = preguntas[index];
+                var respuesta = Model.ObtenerRespuesta(pregunta.Id);
+                var nombreOpciones = $"Respuestas[{index}].OpcionRespuestaIds";
+
+                <section class="survey-card question-card">
+                    <input type="hidden" name="Respuestas[@index].PreguntaId" value="@pregunta.Id" />
+                    <h2 class="question-title">
+                        <span>@pregunta.Texto</span>
+                        @if (pregunta.Obligatoria)
+                        {
+                            <span class="required-mark" aria-label="obligatoria">*</span>
+                        }
+                    </h2>
+                    <p class="question-type">@pregunta.Tipo</p>
+
+                    @if (Model.ErroresPorPregunta.TryGetValue(pregunta.Id, out var errorPregunta))
+                    {
+                        <p class="question-error" role="alert">@errorPregunta</p>
+                    }
+
+                    @switch (pregunta.Tipo)
+                    {
+                        case "Texto corto":
+                            @if (pregunta.Obligatoria)
+                            {
+                                <input class="form-control answer-control" type="text" name="Respuestas[@index].Texto" value="@respuesta.Texto" required aria-required="true" />
+                            }
+                            else
+                            {
+                                <input class="form-control answer-control" type="text" name="Respuestas[@index].Texto" value="@respuesta.Texto" />
+                            }
+                            break;
+
+                        case "Texto largo":
+                            @if (pregunta.Obligatoria)
+                            {
+                                <textarea class="form-control answer-control" name="Respuestas[@index].Texto" rows="4" required aria-required="true">@respuesta.Texto</textarea>
+                            }
+                            else
+                            {
+                                <textarea class="form-control answer-control" name="Respuestas[@index].Texto" rows="4">@respuesta.Texto</textarea>
+                            }
+                            break;
+
+                        case "Selección única":
+                        case "Escala de valoración":
+                            <div class="answer-options">
+                                @foreach (var opcion in pregunta.Opciones.OrderBy(opcion => opcion.Orden))
+                                {
+                                    <label class="answer-option">
+                                        @if (respuesta.OpcionRespuestaIds.Contains(opcion.Id) && pregunta.Obligatoria)
+                                        {
+                                            <input type="radio" name="@nombreOpciones" value="@opcion.Id" checked required aria-required="true" />
+                                        }
+                                        else if (respuesta.OpcionRespuestaIds.Contains(opcion.Id))
+                                        {
+                                            <input type="radio" name="@nombreOpciones" value="@opcion.Id" checked />
+                                        }
+                                        else if (pregunta.Obligatoria)
+                                        {
+                                            <input type="radio" name="@nombreOpciones" value="@opcion.Id" required aria-required="true" />
+                                        }
+                                        else
+                                        {
+                                            <input type="radio" name="@nombreOpciones" value="@opcion.Id" />
+                                        }
+                                        <span>@opcion.Texto</span>
+                                    </label>
+                                }
+                            </div>
+                            break;
+
+                        case "Selección múltiple":
+                            <div class="answer-options">
+                                @foreach (var opcion in pregunta.Opciones.OrderBy(opcion => opcion.Orden))
+                                {
+                                    <label class="answer-option">
+                                        @if (respuesta.OpcionRespuestaIds.Contains(opcion.Id))
+                                        {
+                                            <input type="checkbox" name="@nombreOpciones" value="@opcion.Id" checked />
+                                        }
+                                        else
+                                        {
+                                            <input type="checkbox" name="@nombreOpciones" value="@opcion.Id" />
+                                        }
+                                        <span>@opcion.Texto</span>
+                                    </label>
+                                }
+                            </div>
+                            break;
+
+                        default:
+                            <p class="question-error">Tipo de pregunta no disponible.</p>
+                            break;
+                    }
+                </section>
+            }
+
+            <div class="survey-submit-area">
+                <button class="btn btn-primary btn-lg" type="submit">
+                    <span class="submit-label">Enviar respuestas</span>
+                </button>
+            </div>
+        </form>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        document.getElementById('survey-form')?.addEventListener('submit', function () {
+            const button = this.querySelector('button[type="submit"]');
+            if (button) {
+                button.disabled = true;
+                button.querySelector('.submit-label').textContent = 'Enviando…';
+                button.setAttribute('aria-busy', 'true');
+            }
+        });
+    </script>
+}

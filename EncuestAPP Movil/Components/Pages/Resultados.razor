@@ -1,0 +1,474 @@
+@page "/resultados"
+@using System.Globalization
+@using EncuestAPP_Movil.Services.Exportacion
+@attribute [Authorize]
+@implements IDisposable
+@inject IEncuestaService EncuestaService
+@inject IResultadoService ResultadoService
+@inject NavigationManager Navigation
+
+<PageTitle>@(_resumen?.Titulo ?? "Resultados") | EncuestAPP</PageTitle>
+
+<div class="results-page">
+    <header class="results-page-header">
+        <div class="results-page-copy">
+            <span class="results-page-eyebrow">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20V10m6 10V4m6 16v-7m6 7H2" /></svg>
+                Análisis
+            </span>
+            <h1>Resultados</h1>
+            <p>Consultá las participaciones y respuestas de tus encuestas.</p>
+        </div>
+    </header>
+
+    @if (_errorEncuestas is not null)
+    {
+        <div class="results-notice results-notice-danger" role="alert">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" /><path d="M12 8v4m0 4h.01" /></svg>
+            <div class="results-notice-copy">
+                <strong>No se pudieron cargar tus encuestas</strong>
+                <span>@_errorEncuestas</span>
+            </div>
+            <button type="button" class="results-notice-action" @onclick="ReintentarEncuestasAsync" disabled="@_cargandoEncuestas">Reintentar</button>
+        </div>
+    }
+
+    <section class="results-selector-panel" aria-label="Seleccionar encuesta">
+        <div class="results-panel-heading">
+            <div class="results-panel-title">
+                <span class="results-panel-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 4.5h10A1.5 1.5 0 0 1 18.5 6v12A1.5 1.5 0 0 1 17 19.5H7A1.5 1.5 0 0 1 5.5 18V6A1.5 1.5 0 0 1 7 4.5Z" /><path d="M9 9h6M9 12.5h6M9 16h3" /></svg></span>
+                <div>
+                    <h2>Seleccionar encuesta</h2>
+                    <p>Elegí una encuesta para consultar su actividad y respuestas.</p>
+                </div>
+            </div>
+            <button type="button" class="results-refresh-button" @onclick="ReintentarEncuestasAsync" disabled="@_cargandoEncuestas">
+                @if (_cargandoEncuestas)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                else
+                {
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M5.6 9a7 7 0 0 1 11.6-2L20 12M4 12l2.8 5a7 7 0 0 0 11.6-2" /></svg>
+                }
+                <span>Actualizar listado</span>
+            </button>
+        </div>
+        <label class="results-selector-label" for="encuesta-resultados">Encuesta</label>
+        <div class="results-select-wrap">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5h10A1.5 1.5 0 0 1 18.5 6v12A1.5 1.5 0 0 1 17 19.5H7A1.5 1.5 0 0 1 5.5 18V6A1.5 1.5 0 0 1 7 4.5Z" /><path d="M9 9h6M9 12.5h6M9 16h3" /></svg>
+            <select id="encuesta-resultados" class="results-select" value="@(_encuestaSeleccionadaId?.ToString() ?? string.Empty)" @onchange="EncuestaCambiada" disabled="@(_cargandoEncuestas || _encuestas.Count == 0)">
+                <option value="">Seleccioná una encuesta</option>
+                @foreach (var encuesta in _encuestas)
+                {
+                    <option value="@encuesta.Id">@encuesta.Titulo · @encuesta.Estado</option>
+                }
+            </select>
+        </div>
+        @if (_cargandoEncuestas)
+        {
+            <div class="results-inline-status" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Cargando tus encuestas...</div>
+        }
+        else if (_encuestasCargadas && _encuestas.Count == 0 && _errorEncuestas is null)
+        {
+            <div class="results-selector-empty">
+                <span>No hay encuestas disponibles en tu cuenta.</span>
+            </div>
+        }
+    </section>
+
+    @if (_error is not null)
+    {
+        <div class="results-notice results-notice-danger" role="alert">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" /><path d="M12 8v4m0 4h.01" /></svg>
+            <span class="results-notice-copy">@_error</span>
+        </div>
+    }
+
+    @if (_cargandoResultados)
+    {
+        <div class="results-loading" role="status">
+            <span class="spinner-border" aria-hidden="true"></span>
+            <strong>Cargando resultados...</strong>
+            <span>Estamos preparando el resumen de respuestas.</span>
+        </div>
+    }
+
+    @if (_resumen is not null)
+    {
+        <section class="results-summary-panel" aria-label="Resumen general de resultados">
+            <div class="results-summary-header">
+                <div>
+                    <span class="results-section-eyebrow">Resumen general</span>
+                    <h2>@_resumen.Titulo</h2>
+                </div>
+                <EstadoEncuestaBadge Estado="_resumen.Estado" />
+            </div>
+
+            <div class="results-total-card">
+                <span class="results-total-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 20v-1.5a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V20m7-9a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm8-6a4 4 0 0 1 0 7m5 8v-1.5a4 4 0 0 0-3-3.87" /></svg></span>
+                <div>
+                    <span>Total de participaciones</span>
+                    <strong>@_resumen.TotalParticipaciones</strong>
+                </div>
+            </div>
+
+            @if (_informe is not null && !_cargandoResultados && _error is null)
+            {
+                <a class="results-export-shortcut" href="#exportar-informe">Descargar o compartir informe <span aria-hidden="true">↓</span></a>
+            }
+            <dl class="results-dates">
+                <div><dt>Creada</dt><dd>@FormatoFecha(_resumen.FechaCreacion)</dd></div>
+                @if (_resumen.FechaPublicacion.HasValue)
+                {
+                    <div><dt>Publicada</dt><dd>@FormatoFecha(_resumen.FechaPublicacion.Value)</dd></div>
+                }
+                @if (_resumen.FechaCierre.HasValue)
+                {
+                    <div><dt>Cerrada</dt><dd>@FormatoFecha(_resumen.FechaCierre.Value)</dd></div>
+                }
+            </dl>
+
+            @if (_resumen.TotalParticipaciones == 0)
+            {
+                <div class="results-empty-note" role="status">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" /><path d="M12 8v4m0 4h.01" /></svg>
+                    <span>Esta encuesta todavía no tiene participaciones. Las preguntas se muestran sin respuestas recibidas.</span>
+                </div>
+            }
+        </section>
+
+        <section class="results-question-section" aria-label="Resultados por pregunta">
+            <div class="results-section-header">
+                <div>
+                    <h2>Resultados por pregunta</h2>
+                    <p>Revisá las opciones y respuestas recibidas.</p>
+                </div>
+                <button type="button" class="results-refresh-button" @onclick="ActualizarResultadosAsync" disabled="@(_cargandoResultados || !_encuestaSeleccionadaId.HasValue)">
+                    @if (_cargandoResultados)
+                    {
+                        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                    }
+                    else
+                    {
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M5.6 9a7 7 0 0 1 11.6-2L20 12M4 12l2.8 5a7 7 0 0 0 11.6-2" /></svg>
+                    }
+                    <span>Actualizar resultados</span>
+                </button>
+            </div>
+
+            @if (_detalleEncuesta is not null && _detalleEncuesta.Preguntas.Count == 0)
+            {
+                <div class="results-empty-state">
+                    <span class="results-empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 4.5h10A1.5 1.5 0 0 1 18.5 6v12A1.5 1.5 0 0 1 17 19.5H7A1.5 1.5 0 0 1 5.5 18V6A1.5 1.5 0 0 1 7 4.5Z" /><path d="M9 9h6M9 12.5h6M9 16h3" /></svg></span>
+                    <h3>Esta encuesta no tiene preguntas</h3>
+                    <p>No hay resultados para mostrar todavía.</p>
+                </div>
+            }
+            else if (_detalleEncuesta is not null)
+            {
+                <div class="results-question-list">
+                    @foreach (var pregunta in _detalleEncuesta.Preguntas.OrderBy(x => x.Orden))
+                    {
+                        var resultado = _resultados[pregunta.Id];
+                        <article class="results-question-card" @key="pregunta.Id">
+                            <header class="results-question-header">
+                                <div class="results-question-title">
+                                    <span class="results-question-number">Pregunta @pregunta.Orden</span>
+                                    <h3>@resultado.Texto</h3>
+                                    <span class="results-question-type">@resultado.Tipo</span>
+                                </div>
+                                <span class="results-response-count">@resultado.TotalRespuestas respuestas</span>
+                            </header>
+
+                            @if (resultado.Tipo is "Texto corto" or "Texto largo")
+                            {
+                                @if (resultado.RespuestasTextuales.Count == 0)
+                                {
+                                    <div class="results-question-empty">Todavía no se recibieron respuestas de texto.</div>
+                                }
+                                else
+                                {
+                                    <ul class="results-text-responses">
+                                        @foreach (var respuesta in resultado.RespuestasTextuales)
+                                        {
+                                            <li>
+                                                @if (respuesta?.Length > 320)
+                                                {
+                                                    <details class="text-response-detail"><summary>@(respuesta[..160])… <span>Leer respuesta completa</span></summary><div>@respuesta</div></details>
+                                                }
+                                                else
+                                                {
+                                                    <div>@(string.IsNullOrWhiteSpace(respuesta) ? "(Respuesta vacía)" : respuesta)</div>
+                                                }
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                            }
+                            else if (resultado.TotalRespuestas == 0)
+                            {
+                                <div class="results-question-empty">Esta pregunta todavía no tiene respuestas.</div>
+                                @if (!string.IsNullOrWhiteSpace(resultado.NotaPorcentajes))
+                                {
+                                    <p class="results-percentage-note">@resultado.NotaPorcentajes</p>
+                                }
+                            }
+                            else if (resultado.Opciones.Count == 0)
+                            {
+                                <div class="results-question-empty">No hay opciones de respuesta para mostrar.</div>
+                            }
+                            else
+                            {
+                                <div class="results-options-list">
+                                    @foreach (var opcion in resultado.Opciones)
+                                    {
+                                        <div class="results-option">
+                                            <div class="results-option-heading">
+                                                <span>@opcion.Texto</span>
+                                                <span>@opcion.Cantidad respuesta(s) · @FormatoPorcentaje(opcion.Porcentaje)</span>
+                                            </div>
+                                            <div class="results-progress" role="progressbar" aria-label="@opcion.Texto" aria-valuenow="@opcion.Porcentaje.ToString(CultureInfo.InvariantCulture)" aria-valuemin="0" aria-valuemax="100">
+                                                <div class="results-progress-bar" style="width: @AnchoBarra(opcion.Porcentaje)"></div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(resultado.NotaPorcentajes))
+                                {
+                                    <p class="results-percentage-note">@resultado.NotaPorcentajes</p>
+                                }
+                            }
+                        </article>
+                    }
+                </div>
+            }
+        </section>
+        @if (_informe is not null && !_cargandoResultados && _error is null)
+        {
+            <div id="exportar-informe" class="results-export-anchor"><ExportarResultados @key="_informe" Informe="_informe" /></div>
+        }
+
+    }
+    else if (!_cargandoResultados && _encuestaSeleccionadaId is null && _encuestasCargadas && _encuestas.Count > 0)
+    {
+        <section class="results-empty-state results-select-prompt">
+            <span class="results-empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 4.5h10A1.5 1.5 0 0 1 18.5 6v12A1.5 1.5 0 0 1 17 19.5H7A1.5 1.5 0 0 1 5.5 18V6A1.5 1.5 0 0 1 7 4.5Z" /><path d="M9 9h6M9 12.5h6M9 16h3" /></svg></span>
+            <h2>Elegí una encuesta</h2>
+            <p>Seleccioná una encuesta de tu cuenta para consultar sus resultados.</p>
+        </section>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "encuestaId")]
+    public int? EncuestaId { get; set; }
+
+    private IReadOnlyList<EncuestaListaDto> _encuestas = [];
+    private EncuestaDetalleDto? _detalleEncuesta;
+    private ResultadoGeneralDto? _resumen;
+    private IReadOnlyDictionary<int, ResultadoPreguntaDto> _resultados = new Dictionary<int, ResultadoPreguntaDto>();
+    private CancellationTokenSource? _resultadosCts;
+    private int? _encuestaSeleccionadaId;
+    private int? _consultaQueryAplicada;
+    private string? _error;
+    private string? _errorEncuestas;
+    private bool _encuestasCargadas;
+    private bool _cargandoEncuestas;
+    private bool _cargandoResultados;
+    private long _numeroConsulta;
+    private InformeResultados? _informe;
+    private bool _descartado;
+    private CancellationTokenSource? _encuestasCts;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!_encuestasCargadas && !_cargandoEncuestas)
+        {
+            await CargarEncuestasAsync();
+        }
+
+        if (!_encuestasCargadas || _descartado)
+        {
+            return;
+        }
+
+        await AplicarEncuestaDeLaRutaAsync();
+    }
+
+    private async Task AplicarEncuestaDeLaRutaAsync()
+    {
+        if (EncuestaId == _consultaQueryAplicada)
+        {
+            return;
+        }
+
+        _consultaQueryAplicada = EncuestaId;
+        if (!EncuestaId.HasValue)
+        {
+            _encuestaSeleccionadaId = null;
+            LimpiarResultados();
+            return;
+        }
+
+        if (_encuestas.All(x => x.Id != EncuestaId.Value))
+        {
+            _encuestaSeleccionadaId = null;
+            LimpiarResultados();
+            _error = "No se encontró esa encuesta entre las encuestas de tu cuenta.";
+            return;
+        }
+
+        _encuestaSeleccionadaId = EncuestaId.Value;
+        await CargarResultadosAsync(EncuestaId.Value, true);
+    }
+
+    private async Task ReintentarEncuestasAsync()
+    {
+        await CargarEncuestasAsync();
+        if (_encuestasCargadas)
+        {
+            await AplicarEncuestaDeLaRutaAsync();
+        }
+    }
+
+    private async Task CargarEncuestasAsync()
+    {
+        if (_cargandoEncuestas || _descartado) return;
+        using var cts = new CancellationTokenSource();
+        _encuestasCts = cts;
+        _cargandoEncuestas = true;
+        _errorEncuestas = null;
+        try
+        {
+            var primeraPagina = await EncuestaService.ObtenerPropiasAsync(null, null, null, 1, 100, cts.Token);
+            var encuestas = primeraPagina.Elementos.ToList();
+            for (var pagina = 2; pagina <= primeraPagina.TotalPaginas; pagina++)
+            {
+                var siguiente = await EncuestaService.ObtenerPropiasAsync(null, null, null, pagina, 100, cts.Token);
+                encuestas.AddRange(siguiente.Elementos);
+            }
+            cts.Token.ThrowIfCancellationRequested();
+            _encuestas = encuestas;
+            _encuestasCargadas = true;
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested) { }
+        catch (ApiClientException exception)
+        {
+            if (!_descartado) _errorEncuestas = exception.MensajeConValidaciones;
+        }
+        finally
+        {
+            if (ReferenceEquals(_encuestasCts, cts)) _encuestasCts = null;
+            _cargandoEncuestas = false;
+        }
+    }
+
+    private async Task EncuestaCambiada(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var encuestaId))
+        {
+            _encuestaSeleccionadaId = null;
+            _consultaQueryAplicada = null;
+            Navigation.NavigateTo("/resultados", replace: true);
+            LimpiarResultados();
+            return;
+        }
+
+        if (_encuestas.All(x => x.Id != encuestaId))
+        {
+            _error = "No se encontró esa encuesta entre las encuestas de tu cuenta.";
+            return;
+        }
+
+        _encuestaSeleccionadaId = encuestaId;
+        _consultaQueryAplicada = encuestaId;
+        Navigation.NavigateTo($"/resultados?encuestaId={encuestaId}", replace: true);
+        await CargarResultadosAsync(encuestaId, true);
+    }
+
+    private Task ActualizarResultadosAsync() => _encuestaSeleccionadaId.HasValue
+        ? CargarResultadosAsync(_encuestaSeleccionadaId.Value, false)
+        : Task.CompletedTask;
+
+    private async Task CargarResultadosAsync(int encuestaId, bool limpiarResultados)
+    {
+        if (_descartado) return;
+        _resultadosCts?.Cancel();
+        if (limpiarResultados)
+        {
+            LimpiarResultados();
+        }
+        using var cts = new CancellationTokenSource();
+        _resultadosCts = cts;
+        var numero = ++_numeroConsulta;
+        _error = null;
+        _cargandoResultados = true;
+        _informe = null;
+
+        try
+        {
+            var resumen = await ResultadoService.ObtenerResumenAsync(encuestaId, cts.Token);
+            var detalle = await EncuestaService.ObtenerDetalleAsync(encuestaId, cts.Token);
+            var resultados = new Dictionary<int, ResultadoPreguntaDto>();
+            foreach (var pregunta in detalle.Preguntas.OrderBy(x => x.Orden))
+            {
+                resultados[pregunta.Id] = await ResultadoService.ObtenerPorPreguntaAsync(encuestaId, pregunta.Id, cts.Token);
+            }
+
+            if (!cts.IsCancellationRequested && numero == _numeroConsulta)
+            {
+                _resumen = resumen;
+                _detalleEncuesta = detalle;
+                _resultados = resultados;
+                _informe = InformeResultados.Crear(detalle, resumen, resultados, DateTimeOffset.Now);
+            }
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+        }
+        catch (ApiClientException exception)
+        {
+            if (!cts.IsCancellationRequested && numero == _numeroConsulta)
+            {
+                _error = exception.MensajeConValidaciones;
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_resultadosCts, cts)) _resultadosCts = null;
+            if (numero == _numeroConsulta)
+            {
+                _cargandoResultados = false;
+            }
+        }
+    }
+
+    private void LimpiarResultados()
+    {
+        _resultadosCts?.Cancel();
+        ++_numeroConsulta;
+        _cargandoResultados = false;
+        _informe = null;
+        _resumen = null;
+        _detalleEncuesta = null;
+        _resultados = new Dictionary<int, ResultadoPreguntaDto>();
+        _error = null;
+    }
+
+    private static string AnchoBarra(decimal porcentaje) =>
+        $"{Math.Clamp(porcentaje, 0m, 100m).ToString("0.##", CultureInfo.InvariantCulture)}%";
+
+    private static string FormatoPorcentaje(decimal porcentaje) => $"{porcentaje.ToString("0.##", CultureInfo.CurrentCulture)}%";
+
+    private static string FormatoFecha(DateTime fecha) => fecha.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+
+
+    public void Dispose()
+    {
+        _descartado = true;
+        _encuestasCts?.Cancel();
+        ++_numeroConsulta;
+        _resultadosCts?.Cancel();
+    }
+}

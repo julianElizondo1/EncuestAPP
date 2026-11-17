@@ -1,0 +1,14 @@
+.export-panel {
+    padding: 1.5rem;
+    border: 1px solid #e2e8f0;
+    border-top: 3px solid var(--app-color-accent, #f59e0b);
+    border-radius: 16px;
+    background: #fff;
+}
+.export-panel h2 { color: var(--app-color-navy, #172554); font-size: 1.2rem; }
+.export-panel p { color: var(--app-color-text-muted, #64748b); margin: .75rem 0 0; }
+.export-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
+.export-panel .export-error { color: #b91c1c; }
+
+.export-saved-name { padding: .75rem; border-radius: 8px; background: #f1f5f9; color: #172554; overflow-wrap: anywhere; }
+.export-error { margin-top: 1rem; color: #b91c1c; }

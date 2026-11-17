@@ -1,0 +1,79 @@
+# Visual Studio and .NET build output
+.vs/
+.idea/
+.vscode/
+[Bb]in/
+[Oo]bj/
+[Aa]rtifacts/
+[Pp]ublish/
+[Tt]est[Rr]esults/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+*.rsuser
+*.binlog
+*.log
+*.nupkg
+*.snupkg
+*.cache
+node_modules/
+*.tmp
+
+# Local settings, deployment profiles and signing material
+appsettings.*.json
+!appsettings.example.json
+/EncuestAPP  API/appsettings.json
+launchSettings.json
+*.http
+*.rest
+PublishProfiles/
+*.pubxml
+*.publishsettings
+*.pubxml.user
+*.publishproj
+*.azurePubxml
+.env
+.env.*
+secrets.json
+*.pfx
+*.p12
+*.pem
+*.key
+*.snk
+*.jks
+*.keystore
+*.mobileprovision
+*.provisionprofile
+*.apk
+*.aab
+*.ipa
+*.appx
+*.msix
+*.msixbundle
+AppPackages/
+BundleArtifacts/
+
+# Local databases, backups and standalone SQL scripts
+*.db
+*.db-*
+*.sqlite*
+*.mdf
+*.ldf
+*.bak
+*.bacpac
+*.dacpac
+*.sql
+
+# Internal instructions, documentation and tools
+AGENTS.md
+/.agents/
+/.codex/
+/.aws/
+/docs/
+/tools/
+# Unused optional validation add-on with a contributor contact address
+/EncuestAPP Web/wwwroot/lib/jquery-validation/dist/additional-methods*.js
+.DS_Store
+Thumbs.db

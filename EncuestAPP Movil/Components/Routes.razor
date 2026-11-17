@@ -1,0 +1,46 @@
+@inject ISesionService SesionService
+
+@if (!_sesionRestaurada)
+{
+    <div class="d-flex justify-content-center py-5" role="status">
+        <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        <span>Verificando sesión...</span>
+    </div>
+}
+else
+{
+    <CascadingAuthenticationState>
+        <Router AppAssembly="@typeof(MauiProgram).Assembly">
+            <Found Context="routeData">
+                <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)">
+                    <NotAuthorized>
+                        <EncuestAPP_Movil.Components.RedirectToLogin />
+                    </NotAuthorized>
+                    <Authorizing>
+                        <div class="d-flex justify-content-center py-5" role="status">
+                            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                            <span>Verificando sesión...</span>
+                        </div>
+                    </Authorizing>
+                </AuthorizeRouteView>
+                <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+            </Found>
+            <NotFound>
+                <LayoutView Layout="@typeof(Layout.AuthLayout)">
+                    <div class="alert alert-warning" role="alert">No se encontró la página solicitada.</div>
+                    <NavLink href="/login">Ir al inicio de sesión</NavLink>
+                </LayoutView>
+            </NotFound>
+        </Router>
+    </CascadingAuthenticationState>
+}
+
+@code {
+    private bool _sesionRestaurada;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SesionService.RestaurarAsync();
+        _sesionRestaurada = true;
+    }
+}

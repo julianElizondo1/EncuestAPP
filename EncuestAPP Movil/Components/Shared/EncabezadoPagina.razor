@@ -1,0 +1,15 @@
+<header class="app-page-header">
+    <div>
+        <span class="app-page-eyebrow">@Seccion</span>
+        <h1>@Titulo</h1>
+        @if (!string.IsNullOrWhiteSpace(Descripcion)) { <p>@Descripcion</p> }
+    </div>
+    @if (Acciones is not null) { <div class="app-page-actions">@Acciones</div> }
+</header>
+
+@code {
+    [Parameter, EditorRequired] public string Titulo { get; set; } = string.Empty;
+    [Parameter] public string Seccion { get; set; } = "EncuestAPP";
+    [Parameter] public string? Descripcion { get; set; }
+    [Parameter] public RenderFragment? Acciones { get; set; }
+}

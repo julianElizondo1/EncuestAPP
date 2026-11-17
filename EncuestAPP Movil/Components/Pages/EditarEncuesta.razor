@@ -1,0 +1,19 @@
+@page "/encuestas/{Id:int}/editar"
+@attribute [Authorize]
+
+<PageTitle>Editar encuesta | EncuestAPP</PageTitle>
+
+<div class="app-page">
+<EncabezadoPagina Seccion="Encuestas" Titulo="Editar encuesta" Descripcion="Actualizá los datos generales permitidos por el estado de la encuesta." />
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-3 p-sm-4">
+        <EncuestaForm @key="Id" EncuestaId="@Id" />
+    </div>
+</div>
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+}

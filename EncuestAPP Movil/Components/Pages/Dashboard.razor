@@ -1,0 +1,296 @@
+@using System.Globalization
+@page "/"
+@page "/dashboard"
+@attribute [Authorize]
+@implements IDisposable
+@inject IEncuestaService EncuestaService
+@inject IResultadoService ResultadoService
+@inject ISesionService SesionService
+
+<PageTitle>Inicio | EncuestAPP</PageTitle>
+
+<div class="dashboard-page">
+    <section class="dashboard-hero" aria-labelledby="dashboard-title">
+        <div class="dashboard-hero-copy">
+            <span class="dashboard-kicker">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 19V5m0 14h16M8 15l3-4 3 2 5-7" /></svg>
+                Resumen de actividad
+            </span>
+            <h1 id="dashboard-title">@(SesionService.Usuario is { } usuario && !string.IsNullOrWhiteSpace(usuario.Nombre) ? $"Hola, {usuario.Nombre}" : "Bienvenido a EncuestAPP")</h1>
+            <p>Organizá tus encuestas y seguí su actividad desde un solo lugar.</p>
+        </div>
+        <div class="dashboard-hero-actions">
+            <NavLink class="dashboard-primary-action" href="/encuestas/nueva">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14m-7-7h14" /></svg>
+                <span>Crear encuesta</span>
+            </NavLink>
+            <button type="button" class="dashboard-refresh-action" @onclick="CargarResumenAsync" disabled="@_cargando">
+                @if (_cargando)
+                {
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                }
+                else
+                {
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M5.6 9a7 7 0 0 1 11.6-2L20 12M4 12l2.8 5a7 7 0 0 0 11.6-2" /></svg>
+                }
+                <span>Actualizar</span>
+            </button>
+        </div>
+    </section>
+
+    @if (_error is not null)
+    {
+        <div class="dashboard-error" role="alert">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" /><path d="M12 8v4m0 4h.01" /></svg>
+            <div class="dashboard-error-copy">
+                <strong>No pudimos actualizar el resumen</strong>
+                <span>@_error</span>
+            </div>
+            <button type="button" class="dashboard-error-action" @onclick="CargarResumenAsync" disabled="@_cargando">Reintentar</button>
+        </div>
+    }
+
+    <section class="participation-panel" aria-labelledby="participation-title" aria-busy="@_cargando">
+        <div class="participation-heading">
+            <div><span class="activity-eyebrow">Todas tus encuestas</span><h2 id="participation-title">Actividad de participaciones</h2><p>Un envío completo cuenta como una participación.</p></div>
+        </div>
+        @if (_cargando)
+        {
+            <div class="dashboard-loading" role="status"><span class="spinner-border spinner-border-sm" aria-hidden="true"></span> Actualizando actividad...</div>
+        }
+        else if (_errorActividad is not null)
+        {
+            <div class="participation-unavailable" role="status">@_errorActividad <button type="button" class="btn btn-outline-primary btn-sm" @onclick="CargarResumenAsync">Reintentar</button></div>
+        }
+        else if (_actividad is not null)
+        {
+            <div class="participation-totals">
+                <div><span>Hoy</span><strong>@_actividad.ParticipacionesHoy</strong><small>@_actividad.Hasta.ToString("dd/MM")</small></div>
+                <div><span>Últimos 7 días</span><strong>@_actividad.ParticipacionesUltimosSieteDias</strong><small>Del @_actividad.Desde.ToString("dd/MM") al @_actividad.Hasta.ToString("dd/MM")</small></div>
+            </div>
+            <div class="participation-chart" aria-label="Participaciones por día">
+                @foreach (var dia in _actividad.Dias)
+                {
+                    <div class="participation-day" aria-label="@($"{dia.Fecha:dd/MM}: {dia.Cantidad} participaciones")">
+                        <strong aria-hidden="true">@dia.Cantidad</strong>
+                        <div class="participation-track" aria-hidden="true"><span class="@(dia.Fecha == _actividad.Hasta ? "is-today" : "")" style="height:@AlturaActividad(dia.Cantidad)"></span></div>
+                        <span aria-hidden="true">@dia.Fecha.ToString("ddd", CultureInfo.CurrentCulture)</span><small aria-hidden="true">@dia.Fecha.ToString("dd/MM")</small>
+                    </div>
+                }
+            </div>
+            @if (_actividad.ParticipacionesUltimosSieteDias == 0)
+            {
+                <p class="participation-empty">Todavía no recibiste participaciones en este período.</p>
+            }
+            <p class="participation-updated">Actualizado: @_actividad.GeneradoEn.ToLocalTime().ToString("dd/MM HH:mm") · Horario local @($"(UTC{FormatoDesfase(_actividad.DesfaseUtcMinutos)})").</p>
+        }
+    </section>
+
+    <section class="dashboard-stat-grid" aria-label="Resumen de encuestas">
+        @if (_datosCargados)
+        {
+            <article class="dashboard-stat-card dashboard-stat-card-total">
+                <span class="dashboard-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 4.5h10A1.5 1.5 0 0 1 18.5 6v12A1.5 1.5 0 0 1 17 19.5H7A1.5 1.5 0 0 1 5.5 18V6A1.5 1.5 0 0 1 7 4.5Z" /><path d="M9 9h6M9 12.5h6M9 16h3" /></svg></span>
+                <p class="dashboard-stat-value">@_total</p>
+                <h2 class="dashboard-stat-label">Total de encuestas</h2>
+            </article>
+            <article class="dashboard-stat-card dashboard-stat-card-published">
+                <span class="dashboard-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M3.5 12h17M12 3a14 14 0 0 1 0 18m0-18a14 14 0 0 0 0 18" /></svg></span>
+                <p class="dashboard-stat-value">@_publicadas</p>
+                <h2 class="dashboard-stat-label">Publicadas</h2>
+            </article>
+            <article class="dashboard-stat-card dashboard-stat-card-draft">
+                <span class="dashboard-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20h4l11-11a2.1 2.1 0 0 0-4-4L4 16v4Z" /><path d="m13.5 6.5 4 4" /></svg></span>
+                <p class="dashboard-stat-value">@_borradores</p>
+                <h2 class="dashboard-stat-label">Borradores</h2>
+            </article>
+            <article class="dashboard-stat-card dashboard-stat-card-closed">
+                <span class="dashboard-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 5V3h8v2M8 12h8m-8 4h5" /></svg></span>
+                <p class="dashboard-stat-value">@_cerradas</p>
+                <h2 class="dashboard-stat-label">Cerradas</h2>
+            </article>
+            <article class="dashboard-stat-card dashboard-stat-card-archived">
+                <span class="dashboard-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h16v13H4zM3 4h18v3H3zM9 11h6" /></svg></span>
+                <p class="dashboard-stat-value">@_archivadas</p>
+                <h2 class="dashboard-stat-label">Archivadas</h2>
+            </article>
+        }
+        else if (_cargando)
+        {
+            <div class="dashboard-loading" role="status">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                <span>Consultando el resumen de tus encuestas…</span>
+            </div>
+        }
+    </section>
+
+    @if (_datosCargados && _total > 0)
+    {
+        <section class="activity-panel" aria-labelledby="activity-title">
+            <div><span class="activity-eyebrow">Panorama general</span><h2 id="activity-title">Tus encuestas, por estado</h2><p>Distribución actual de las @_total encuestas de tu cuenta.</p></div>
+            <div class="activity-chart" role="img" aria-label="@($"Borradores: {_borradores}; publicadas: {_publicadas}; cerradas: {_cerradas}; archivadas: {_archivadas}.")">
+                @foreach (var estado in DistribucionEstados())
+                {
+                    if (estado.Cantidad > 0)
+                    {
+                        <span class="activity-segment @estado.Clase" style="flex-grow:@estado.Cantidad" title="@($"{estado.Nombre}: {estado.Cantidad}")"></span>
+                    }
+                }
+            </div>
+            <div class="activity-legend">
+                @foreach (var estado in DistribucionEstados())
+                {
+                    <div><span class="activity-dot @estado.Clase" aria-hidden="true"></span><span>@estado.Nombre</span><strong>@estado.Cantidad</strong></div>
+                }
+            </div>
+            <NavLink class="activity-link" href="/resultados">Explorar resultados <span aria-hidden="true">→</span></NavLink>
+        </section>
+    }
+
+    @if (_datosCargados)
+    {
+        <section class="dashboard-recent-section" aria-labelledby="dashboard-recent-title">
+            <div class="dashboard-section-heading dashboard-recent-heading">
+                <div>
+                    <h2 id="dashboard-recent-title">Encuestas recientes</h2>
+                    <p>Un vistazo a la actividad más reciente.</p>
+                </div>
+                @if (_total > 0)
+                {
+                    <span class="dashboard-recent-count">Últimas @_recientes.Count de @_total</span>
+                }
+            </div>
+            @if (_recientes.Count == 0)
+            {
+                <div class="dashboard-empty-state">
+                    <span class="dashboard-empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 4.5h10A1.5 1.5 0 0 1 18.5 6v12A1.5 1.5 0 0 1 17 19.5H7A1.5 1.5 0 0 1 5.5 18V6A1.5 1.5 0 0 1 7 4.5Z" /><path d="M9 9h6M9 12.5h6M9 16h3" /></svg></span>
+                    <h3>@(_total == 0 ? "Tu primera encuesta empieza acá" : "No hay encuestas recientes")</h3>
+                    <p>@(_total == 0 ? "Creá una encuesta para empezar a reunir opiniones y consultar sus resultados." : "Podés consultar todas tus encuestas desde el listado.")</p>
+                    <NavLink class="dashboard-empty-action" href="@(_total == 0 ? "/encuestas/nueva" : "/encuestas")">@(_total == 0 ? "Crear mi primera encuesta" : "Ver mis encuestas")</NavLink>
+                </div>
+            }
+            else
+            {
+                <div class="dashboard-recent-grid">
+                    @foreach (var encuesta in _recientes)
+                    {
+                        <div class="dashboard-recent-item" @key="encuesta.Id">
+                            <EncuestaCard Encuesta="encuesta" />
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    }
+</div>
+
+@code {
+    private (string Nombre, int Cantidad, string Clase)[] DistribucionEstados() =>
+        [("Borradores", _borradores, "state-draft"), ("Publicadas", _publicadas, "state-live"), ("Cerradas", _cerradas, "state-closed"), ("Archivadas", _archivadas, "state-archived")];
+
+    private static readonly string[] Estados = ["Borrador", "Publicada", "Cerrada", "Archivada"];
+
+    private ActividadParticipacionesDto? _actividad;
+    private string? _errorActividad;
+    private string AlturaActividad(int cantidad) => $"{(100m * cantidad / Math.Max(1, _actividad?.Dias.Max(x => x.Cantidad) ?? 0)).ToString("0.##", CultureInfo.InvariantCulture)}%";
+    private static string FormatoDesfase(int minutos) => $"{(minutos < 0 ? "-" : "+")}{Math.Abs(minutos) / 60:00}:{Math.Abs(minutos) % 60:00}";
+
+    private async Task CargarActividadAsync(long numero, CancellationToken token)
+    {
+        try
+        {
+            var desfase = (int)TimeZoneInfo.Local.GetUtcOffset(DateTimeOffset.UtcNow).TotalMinutes;
+            var actividad = await ResultadoService.ObtenerActividadAsync(desfase, token);
+            if (!token.IsCancellationRequested && numero == _numeroConsulta)
+            {
+                _actividad = actividad;
+                _errorActividad = null;
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (ApiClientException exception)
+        {
+            if (!token.IsCancellationRequested && numero == _numeroConsulta)
+            {
+                _actividad = null;
+                _errorActividad = exception.StatusCode == System.Net.HttpStatusCode.NotFound
+                    ? "Las estadísticas estarán disponibles cuando se actualice el servidor."
+                    : $"No pudimos consultar la actividad. {exception.Message}";
+            }
+        }
+    }
+
+    private CancellationTokenSource? _cargaCts;
+    private IReadOnlyList<EncuestaListaDto> _recientes = [];
+    private string? _error;
+    private bool _cargando;
+    private bool _datosCargados;
+    private int _total;
+    private int _borradores;
+    private int _publicadas;
+    private int _cerradas;
+    private int _archivadas;
+    private long _numeroConsulta;
+
+    protected override Task OnInitializedAsync() => CargarResumenAsync();
+
+    private async Task CargarResumenAsync()
+    {
+        _cargaCts?.Cancel();
+        using var cts = new CancellationTokenSource();
+        _cargaCts = cts;
+        var numero = ++_numeroConsulta;
+        _error = null;
+        _errorActividad = null;
+        _cargando = true;
+        var actividadTask = CargarActividadAsync(numero, cts.Token);
+
+        try
+        {
+            var recientesTask = EncuestaService.ObtenerPropiasAsync(null, null, null, 1, 5, cts.Token);
+            var borradoresTask = EncuestaService.ObtenerPropiasAsync(Estados[0], null, null, 1, 1, cts.Token);
+            var publicadasTask = EncuestaService.ObtenerPropiasAsync(Estados[1], null, null, 1, 1, cts.Token);
+            var cerradasTask = EncuestaService.ObtenerPropiasAsync(Estados[2], null, null, 1, 1, cts.Token);
+            var archivadasTask = EncuestaService.ObtenerPropiasAsync(Estados[3], null, null, 1, 1, cts.Token);
+
+            await Task.WhenAll(recientesTask, borradoresTask, publicadasTask, cerradasTask, archivadasTask);
+
+            if (!cts.IsCancellationRequested && numero == _numeroConsulta)
+            {
+                var recientes = await recientesTask;
+                _total = recientes.TotalElementos;
+                _recientes = recientes.Elementos;
+                _borradores = (await borradoresTask).TotalElementos;
+                _publicadas = (await publicadasTask).TotalElementos;
+                _cerradas = (await cerradasTask).TotalElementos;
+                _archivadas = (await archivadasTask).TotalElementos;
+                _datosCargados = true;
+            }
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+        }
+        catch (ApiClientException exception)
+        {
+            if (!cts.IsCancellationRequested && numero == _numeroConsulta)
+            {
+                _error = exception.Message;
+            }
+        }
+        finally
+        {
+            await actividadTask;
+            if (ReferenceEquals(_cargaCts, cts)) _cargaCts = null;
+            if (numero == _numeroConsulta)
+            {
+                _cargando = false;
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        ++_numeroConsulta;
+        _cargaCts?.Cancel();
+    }
+}

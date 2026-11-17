@@ -1,0 +1,753 @@
+@page "/encuestas/{Id:int}"
+@using EncuestAPP_Movil.Configuration
+@using Microsoft.Maui.ApplicationModel.DataTransfer
+@using QRCoder
+@attribute [Authorize]
+@implements IDisposable
+@inject IEncuestaService EncuestaService
+@inject IPreguntaService PreguntaService
+@inject NavigationManager Navigation
+@inject ILogger<DetalleEncuesta> Logger
+
+<PageTitle>@(_encuesta?.Titulo ?? "Detalle de encuesta") | EncuestAPP</PageTitle>
+
+<EncabezadoPagina Seccion="Encuestas" Titulo="@(_encuesta?.Titulo ?? "Detalle de encuesta")" Descripcion="Detalle y administración de la encuesta.">
+    <Acciones><NavLink class="btn btn-outline-secondary" href="/encuestas">Volver al listado</NavLink></Acciones>
+</EncabezadoPagina>
+
+@if (_cargando && _encuesta is null)
+{
+    <div class="d-flex align-items-center gap-2 py-4" role="status">
+        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+        <span>Cargando encuesta...</span>
+    </div>
+}
+else if (_encuesta is null)
+{
+    <div class="alert alert-danger" role="alert">
+        <p class="mb-2">@(_error ?? "No se pudo cargar la encuesta.")</p>
+        <button type="button" disabled="@(_cargando || _procesando)" class="btn btn-outline-danger" @onclick="CargarDetalleAsync">Reintentar</button>
+    </div>
+}
+else
+{
+    @if (_error is not null)
+    {
+        <div class="alert alert-danger" role="alert">@_error</div>
+    }
+    @if (_mensaje is not null)
+    {
+        <div class="alert alert-success" role="status">@_mensaje</div>
+    }
+    @if (_sincronizacionPendiente)
+    {
+        <div class="alert alert-warning" role="alert">
+            No se pudo actualizar el estado mostrado. Se conserva el último dato recibido del servidor.
+            <button type="button" class="btn btn-sm btn-outline-warning ms-2" @onclick="CargarDetalleAsync" disabled="@_cargando">Actualizar</button>
+        </div>
+    }
+
+    <section class="card border-0 shadow-sm mb-4" aria-label="Datos generales">
+        <div class="card-body p-3 p-sm-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                <h2 class="h4 mb-0">Datos generales</h2>
+                <EstadoEncuestaBadge Estado="_encuesta.Estado" />
+            </div>
+            @if (!string.IsNullOrWhiteSpace(_encuesta.Descripcion))
+            {
+                <p class="text-secondary">@_encuesta.Descripcion</p>
+            }
+            <dl class="row mb-0">
+                <dt class="col-sm-5">Categoría</dt>
+                <dd class="col-sm-7">@_encuesta.Categoria</dd>
+                <dt class="col-sm-5">Creada</dt>
+                <dd class="col-sm-7">@FormatoFecha(_encuesta.FechaCreacion)</dd>
+                @if (_encuesta.FechaPublicacion.HasValue)
+                {
+                    <dt class="col-sm-5">Publicada</dt>
+                    <dd class="col-sm-7">@FormatoFecha(_encuesta.FechaPublicacion.Value)</dd>
+                }
+                @if (_encuesta.FechaCierre.HasValue)
+                {
+                    <dt class="col-sm-5">Cerrada</dt>
+                    <dd class="col-sm-7">@FormatoFecha(_encuesta.FechaCierre.Value)</dd>
+                }
+                <dt class="col-sm-5">Anónima</dt>
+                <dd class="col-sm-7">@(_encuesta.EsAnonima ? "Sí" : "No")</dd>
+                <dt class="col-sm-5">Una respuesta por dispositivo</dt>
+                <dd class="col-sm-7">@(_encuesta.UnaRespuestaPorDispositivo ? "Sí" : "No")</dd>
+            </dl>
+        </div>
+    </section>
+
+    <section class="card border-0 shadow-sm mb-4" aria-label="Preguntas">
+        <div class="card-body p-3 p-sm-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h2 class="h4 mb-0">Preguntas</h2>
+                @if (PuedeAdministrarEstructura && _tiposPregunta.Count > 0 && !_agregarPregunta)
+                {
+                    <button type="button" disabled="@(_cargando || _procesando)" class="btn btn-primary" @onclick="IniciarCreacionPregunta">Agregar pregunta</button>
+                }
+            </div>
+            @if (_errorTiposPregunta is not null && PuedeAdministrarEstructura)
+            {
+                <div class="alert alert-warning" role="alert">@_errorTiposPregunta</div>
+            }
+            @if (_preguntas is null)
+            {
+                @if (_cargando)
+                {
+                    <div class="d-flex align-items-center gap-2 py-3" role="status">
+                        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                        <span>Cargando preguntas...</span>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-secondary mb-0">No se pudieron cargar las preguntas. Actualizá el detalle para volver a intentar.</p>
+                }
+            }
+            else if (_preguntas.Count == 0)
+            {
+                <p class="text-secondary mb-0">Esta encuesta todavía no tiene preguntas.</p>
+            }
+            else
+            {
+                <div class="d-flex flex-column gap-3">
+                    @foreach (var pregunta in _preguntas.OrderBy(x => x.Orden))
+                    {
+                        <article class="border rounded-3 p-3" @key="pregunta.Id">
+                            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                                <div>
+                                    <h3 class="h6 mb-1">@(pregunta.Orden). @pregunta.Texto</h3>
+                                    <span class="badge text-bg-light">@pregunta.Tipo</span>
+                                    <span class="small text-secondary ms-2">@(pregunta.Obligatoria ? "Obligatoria" : "Opcional")</span>
+                                </div>
+                                @if (PuedeAdministrarEstructura)
+                                {
+                                    <div class="d-flex flex-wrap gap-2">
+                                        @if (_tiposPregunta.Count > 0 && _preguntaEnEdicion != pregunta.Id)
+                                        {
+                                            <button type="button" disabled="@(_cargando || _procesando)" class="btn btn-sm btn-outline-primary" @onclick="() => EditarPregunta(pregunta.Id)">Editar</button>
+                                        }
+                                        <button type="button" disabled="@(_cargando || _procesando)" class="btn btn-sm btn-outline-danger" @onclick="() => SolicitarEliminarPregunta(pregunta.Id)">Eliminar</button>
+                                    </div>
+                                }
+                            </div>
+                            @if (_preguntaEnEdicion == pregunta.Id && PuedeAdministrarEstructura)
+                            {
+                                <PreguntaForm EncuestaId="_encuesta.Id" Pregunta="pregunta" Tipos="_tiposPregunta" OnSaved="ActualizarDespuesDeCambioAsync" OnCancel="CancelarEdicionPregunta" />
+                            }
+                            @if (pregunta.Opciones.Count > 0)
+                            {
+                                <ul class="list-group list-group-flush mt-2">
+                                    @foreach (var opcion in pregunta.Opciones.OrderBy(x => x.Orden))
+                                    {
+                                        <li class="list-group-item px-0">
+                                            @if (_opcionEnEdicion == opcion.Id && PuedeAdministrarEstructura)
+                                            {
+                                                <OpcionForm PreguntaId="pregunta.Id" Opcion="opcion" OrdenInicial="opcion.Orden" OnSaved="ActualizarDespuesDeCambioAsync" OnCancel="CancelarEdicionOpcion" />
+                                            }
+                                            else
+                                            {
+                                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                                    <span>@(opcion.Orden). @opcion.Texto</span>
+                                                    @if (PuedeAdministrarEstructura)
+                                                    {
+                                                        <div class="d-flex gap-2">
+                                                            <button type="button" disabled="@(_cargando || _procesando)" class="btn btn-sm btn-outline-primary" @onclick="() => EditarOpcion(opcion.Id)">Editar</button>
+                                                            <button type="button" disabled="@(_cargando || _procesando)" class="btn btn-sm btn-outline-danger" @onclick="() => SolicitarEliminarOpcion(opcion.Id)">Eliminar</button>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            }
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                            @if (PuedeAdministrarEstructura && AdmiteOpciones(pregunta.Tipo) && _opcionNuevaPreguntaId == pregunta.Id)
+                            {
+                                <OpcionForm PreguntaId="pregunta.Id" OrdenInicial="SiguienteOrden(pregunta.Opciones.Select(x => x.Orden))" OnSaved="ActualizarDespuesDeCambioAsync" OnCancel="CancelarNuevaOpcion" />
+                            }
+                            @if (PuedeAdministrarEstructura && AdmiteOpciones(pregunta.Tipo) && _opcionNuevaPreguntaId != pregunta.Id)
+                            {
+                                <button type="button" disabled="@(_cargando || _procesando)" class="btn btn-sm btn-outline-primary mt-2" @onclick="() => IniciarNuevaOpcion(pregunta.Id)">Agregar opción</button>
+                            }
+                        </article>
+                    }
+                </div>
+            }
+            @if (_agregarPregunta && PuedeAdministrarEstructura)
+            {
+                <PreguntaForm EncuestaId="_encuesta.Id" Tipos="_tiposPregunta" OrdenInicial="SiguienteOrden(_preguntas?.Select(x => x.Orden) ?? [])" OnSaved="ActualizarDespuesDeCambioAsync" OnCancel="CancelarCreacionPregunta" />
+            }
+            @if (PuedeAdministrarEstructura)
+            {
+                <p class="small text-secondary mt-3 mb-0">Cada pregunta y opción necesita un número de orden positivo y sin repetir. Usá una posición libre antes de intercambiar dos elementos.</p>
+            }
+        </div>
+    </section>
+
+    <section class="card border-0 shadow-sm mb-4" aria-label="Acciones de encuesta">
+        <div class="card-body p-3 p-sm-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h2 class="h4 mb-0">Acciones</h2>
+                <NavLink class="btn btn-outline-primary" href="@($"/resultados?encuestaId={_encuesta.Id}")">Ver resultados</NavLink>
+            </div>
+            @if (_sincronizacionPendiente)
+            {
+                <p class="text-secondary mb-0">Actualizá el estado desde el servidor antes de realizar otra acción.</p>
+            }
+            else
+            {
+                <div class="d-flex flex-column flex-sm-row flex-wrap gap-2">
+                    @if (PuedeEditar)
+                    {
+                        <NavLink class="btn btn-outline-primary btn-lg" href="@($"/encuestas/{_encuesta.Id}/editar")">Editar datos generales</NavLink>
+                    }
+                    @if (PuedePublicar)
+                    {
+                        <button type="button" disabled="@(_cargando || _procesando)" class="btn btn-success btn-lg" @onclick='() => SolicitarAccion("publicar")'>Publicar</button>
+                        <p class="small text-secondary align-self-center mb-0">Revisá que la encuesta tenga título, preguntas y las opciones necesarias antes de publicarla.</p>
+                    }
+                    @if (_encuesta.Estado == "Publicada" && PuedeEditar)
+                    {
+                        <p class="small text-secondary align-self-center mb-0">Solo podés editar los datos generales de una encuesta publicada mientras no tenga participaciones.</p>
+                    }
+                    @if (_encuesta.Estado == "Publicada")
+                    {
+                        <button type="button" disabled="@(_cargando || _procesando)" class="btn btn-outline-danger btn-lg" @onclick='() => SolicitarAccion("cerrar")'>Cerrar encuesta</button>
+                    }
+                    @if (_encuesta.Estado is "Borrador" or "Cerrada")
+                    {
+                        <button type="button" disabled="@(_cargando || _procesando)" class="btn btn-outline-secondary btn-lg" @onclick='() => SolicitarAccion("archivar")'>Archivar</button>
+                    }
+                    @if (_encuesta.Estado is "Publicada" or "Cerrada")
+                    {
+                        <button type="button" disabled="@(_cargando || _procesando)" class="btn btn-outline-primary btn-lg" @onclick='() => SolicitarAccion("version")'>Crear nueva versión</button>
+                    }
+                </div>
+            }
+            @if (_cargando)
+            {
+                <div class="small text-secondary mt-3" role="status">Actualizando datos...</div>
+            }
+        </div>
+    </section>
+
+    @if (PuedeCompartirPublicamente)
+    {
+        <section class="public-share-panel" aria-labelledby="public-share-title">
+            <div class="public-share-heading">
+                <span class="public-share-heading-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.7 10.7 6.6-4.4m-6.6 7 6.6 4.4" /></svg>
+                </span>
+                <div>
+                    <h2 id="public-share-title">Compartir encuesta</h2>
+                    <p>La encuesta está publicada y disponible para recibir participaciones.</p>
+                </div>
+            </div>
+            <div class="public-share-actions">
+                <button type="button" class="public-share-button public-share-button-primary" @onclick="CopiarEnlacePublicoAsync" disabled="@(_copiandoEnlace || _compartiendoEnlace)">
+                    @if (_copiandoEnlace)
+                    {
+                        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                    }
+                    else
+                    {
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></svg>
+                    }
+                    <span>Copiar enlace</span>
+                </button>
+                <button type="button" class="public-share-button" @onclick="CompartirEnlacePublicoAsync" disabled="@(_copiandoEnlace || _compartiendoEnlace)">
+                    @if (_compartiendoEnlace)
+                    {
+                        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                    }
+                    else
+                    {
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.7 10.7 6.6-4.4m-6.6 7 6.6 4.4" /></svg>
+                    }
+                    <span>Compartir</span>
+                </button>
+                <button type="button" class="public-share-button" @onclick="MostrarCodigoQr" disabled="@(_copiandoEnlace || _compartiendoEnlace)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h3v3h-3zM19 14v2m2 2v3h-3m-4 0v-2" /></svg>
+                    <span>Ver código QR</span>
+                </button>
+            </div>
+        </section>
+    }
+    else if (_encuesta.Estado == "Publicada" && string.IsNullOrWhiteSpace(_encuesta.TokenPublico))
+    {
+        <div class="public-share-unavailable" role="status">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v4m0 3h.01" /></svg>
+            <span>Esta encuesta figura como publicada, pero no tiene un token público disponible para compartir.</span>
+        </div>
+    }
+
+    @if (_qrAbierto && _codigoQrDataUri is not null && PuedeCompartirPublicamente)
+    {
+        <DialogoModal Titulo="Código QR de la encuesta" OnClose="CerrarCodigoQr">
+            <ChildContent>
+                <span class="public-share-kicker">ENLACE PÚBLICO</span>
+                <div class="public-qr-image-frame">
+                    <img src="@_codigoQrDataUri" alt="Código QR para abrir la encuesta publicada" />
+                </div>
+                <p class="public-qr-caption">Escaneá este código con otro dispositivo para abrir la encuesta.</p>
+                <code class="public-qr-link">@EnlaceEncuestaPublica</code>
+            </ChildContent>
+            <Acciones>
+                <button type="button" class="btn btn-outline-secondary" autofocus @onclick="CerrarCodigoQr">Cerrar</button>
+                <button type="button" class="btn btn-primary" @onclick="CopiarEnlacePublicoAsync" disabled="@_copiandoEnlace">Copiar enlace</button>
+            </Acciones>
+        </DialogoModal>
+    }
+}
+
+@if (_accionPendiente is not null)
+{
+    <ConfirmacionModal Titulo="@TituloConfirmacion" Mensaje="@MensajeConfirmacion" TextoConfirmar="@TextoConfirmar" ClaseConfirmar="@ClaseConfirmar" Ocupado="_procesando" OnConfirm="ConfirmarAccionAsync" OnCancel="CancelarAccion" />
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private EncuestaDetalleDto? _encuesta;
+    private string? _error;
+    private string? _errorTiposPregunta;
+    private string? _mensaje;
+    private string? _accionPendiente;
+    private IReadOnlyList<PreguntaDto>? _preguntas;
+    private IReadOnlyList<CatalogoDto> _tiposPregunta = [];
+    private int? _preguntaEnEdicion;
+    private int? _opcionEnEdicion;
+    private int? _opcionNuevaPreguntaId;
+    private int? _preguntaPendienteId;
+    private int? _opcionPendienteId;
+    private bool _cargando;
+    private bool _procesando;
+    private bool _sincronizacionPendiente;
+    private bool _agregarPregunta;
+    private bool _copiandoEnlace;
+    private bool _compartiendoEnlace;
+    private bool _qrAbierto;
+    private string? _codigoQrDataUri;
+    private int? _idCargado;
+    private bool _descartado;
+    private long _numeroCarga;
+    private CancellationTokenSource? _detalleCts;
+
+    private bool PuedeEditar => _encuesta?.Estado is "Borrador" or "Publicada";
+    private bool PuedeAdministrarEstructura => _encuesta?.Estado == "Borrador" && !_sincronizacionPendiente;
+    private bool PuedePublicar => _encuesta?.Estado == "Borrador" && !_sincronizacionPendiente;
+    private bool PuedeCompartirPublicamente => _encuesta?.Estado == "Publicada"
+        && !_sincronizacionPendiente
+        && !string.IsNullOrWhiteSpace(_encuesta.TokenPublico);
+    private string? EnlaceEncuestaPublica => PuedeCompartirPublicamente
+        ? PublicWebConfiguration.CrearEnlaceEncuesta(_encuesta!.TokenPublico)
+        : null;
+
+    private string TituloConfirmacion => _accionPendiente switch
+    {
+        "publicar" => "Publicar encuesta",
+        "cerrar" => "Cerrar encuesta",
+        "archivar" => "Archivar encuesta",
+        "version" => "Crear nueva versión",
+        "eliminar-pregunta" => "Eliminar pregunta",
+        "eliminar-opcion" => "Eliminar opción",
+        _ => "Confirmar acción"
+    };
+
+    private string MensajeConfirmacion => _accionPendiente switch
+    {
+        "publicar" => "La encuesta quedará publicada y disponible según su configuración. ¿Querés continuar?",
+        "cerrar" => "La encuesta dejará de aceptar nuevas participaciones. ¿Querés cerrarla?",
+        "archivar" => "La encuesta quedará archivada. ¿Querés continuar?",
+        "version" => "Se creará un nuevo borrador con la configuración, preguntas y opciones, sin copiar las respuestas. ¿Querés continuar?",
+        "eliminar-pregunta" => "Se eliminará la pregunta y sus opciones de respuesta. ¿Querés continuar?",
+        "eliminar-opcion" => "Se eliminará esta opción de respuesta. ¿Querés continuar?",
+        _ => string.Empty
+    };
+
+    private string TextoConfirmar => _accionPendiente switch
+    {
+        "publicar" => "Publicar",
+        "cerrar" => "Cerrar encuesta",
+        "archivar" => "Archivar",
+        "version" => "Crear versión",
+        "eliminar-pregunta" => "Eliminar pregunta",
+        "eliminar-opcion" => "Eliminar opción",
+        _ => "Confirmar"
+    };
+
+    private string ClaseConfirmar => _accionPendiente switch
+    {
+        "archivar" or "cerrar" => "btn-danger",
+        "publicar" => "btn-success",
+        _ => "btn-primary"
+    };
+
+    protected override Task OnParametersSetAsync()
+    {
+        if (_idCargado != Id)
+        {
+            _idCargado = Id;
+            _mensaje = null;
+            _error = null;
+            _accionPendiente = null;
+            _preguntaEnEdicion = null;
+            _opcionEnEdicion = null;
+            _opcionNuevaPreguntaId = null;
+            _preguntaPendienteId = null;
+            _opcionPendienteId = null;
+            _agregarPregunta = false;
+            _sincronizacionPendiente = false;
+            _encuesta = null;
+            _preguntas = null;
+            _tiposPregunta = [];
+            _qrAbierto = false;
+            _codigoQrDataUri = null;
+        }
+        return CargarDetalleAsync();
+    }
+
+    private async Task CopiarEnlacePublicoAsync()
+    {
+        if (_copiandoEnlace || _compartiendoEnlace || _descartado) return;
+        var enlace = EnlaceEncuestaPublica;
+        var encuesta = _encuesta;
+        if (enlace is null || encuesta is null)
+        {
+            _error = "No hay un enlace público disponible para esta encuesta.";
+            return;
+        }
+
+        _error = null;
+        _mensaje = null;
+        _copiandoEnlace = true;
+        try
+        {
+            await Clipboard.Default.SetTextAsync(enlace);
+            if (EsEncuestaActual(encuesta.Id)) _mensaje = "Enlace público copiado al portapapeles.";
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "No se pudo copiar el enlace público de la encuesta {EncuestaId}.", encuesta.Id);
+            if (EsEncuestaActual(encuesta.Id)) _error = "No se pudo copiar el enlace. Revisá los permisos del portapapeles e intentá nuevamente.";
+        }
+        finally
+        {
+            _copiandoEnlace = false;
+        }
+    }
+
+    private async Task CompartirEnlacePublicoAsync()
+    {
+        if (_copiandoEnlace || _compartiendoEnlace || _descartado) return;
+        var enlace = EnlaceEncuestaPublica;
+        var encuesta = _encuesta;
+        if (enlace is null || encuesta is null)
+        {
+            _error = "No hay un enlace público disponible para esta encuesta.";
+            return;
+        }
+
+        _error = null;
+        _mensaje = null;
+        _compartiendoEnlace = true;
+        try
+        {
+            await Share.Default.RequestAsync(new ShareTextRequest
+            {
+                Title = $"Compartir: {encuesta.Titulo}",
+                Text = $"Respondé la encuesta \"{encuesta.Titulo}\" en EncuestAPP:\n{enlace}"
+            });
+            if (EsEncuestaActual(encuesta.Id)) _mensaje = "Se abrió el menú para compartir.";
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "No se pudo compartir el enlace público de la encuesta {EncuestaId}.", encuesta.Id);
+            if (EsEncuestaActual(encuesta.Id)) _error = "No se pudo abrir el menú para compartir. Intentá nuevamente.";
+        }
+        finally
+        {
+            _compartiendoEnlace = false;
+        }
+    }
+
+    private void MostrarCodigoQr()
+    {
+        var enlace = EnlaceEncuestaPublica;
+        if (enlace is null)
+        {
+            _error = "No hay un enlace público disponible para esta encuesta.";
+            return;
+        }
+
+        _error = null;
+        _mensaje = null;
+        try
+        {
+            using var generator = new QRCodeGenerator();
+            using var qrData = generator.CreateQrCode(enlace, QRCodeGenerator.ECCLevel.Q);
+            var svg = new SvgQRCode(qrData).GetGraphic(10, "#172554", "#FFFFFF", true);
+            _codigoQrDataUri = $"data:image/svg+xml;base64,{Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(svg))}";
+            _qrAbierto = true;
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "No se pudo generar el código QR de la encuesta {EncuestaId}.", _encuesta!.Id);
+            _codigoQrDataUri = null;
+            _qrAbierto = false;
+            _error = "No se pudo generar el código QR. Intentá nuevamente.";
+        }
+    }
+
+    private void CerrarCodigoQr() => _qrAbierto = false;
+
+    private async Task CargarDetalleAsync()
+    {
+        if (_descartado) return;
+        _error = null;
+        try
+        {
+            await CargarDatosDesdeApiAsync();
+            _sincronizacionPendiente = false;
+        }
+        catch (OperationCanceledException) { }
+        catch (ApiClientException exception)
+        {
+            if (!_descartado) _error = exception.MensajeConValidaciones;
+        }
+    }
+
+    private void SolicitarAccion(string accion)
+    {
+        if (_cargando || _procesando || _descartado) return;
+        _accionPendiente = accion;
+        _error = null;
+    }
+
+    private void CancelarAccion() => _accionPendiente = null;
+
+    private void IniciarCreacionPregunta()
+    {
+        _agregarPregunta = true;
+        _preguntaEnEdicion = null;
+        _opcionEnEdicion = null;
+        _opcionNuevaPreguntaId = null;
+    }
+
+    private void CancelarCreacionPregunta() => _agregarPregunta = false;
+
+    private void EditarPregunta(int id)
+    {
+        _agregarPregunta = false;
+        _preguntaEnEdicion = id;
+        _opcionEnEdicion = null;
+        _opcionNuevaPreguntaId = null;
+    }
+
+    private void CancelarEdicionPregunta() => _preguntaEnEdicion = null;
+
+    private void IniciarNuevaOpcion(int preguntaId)
+    {
+        _opcionNuevaPreguntaId = preguntaId;
+        _opcionEnEdicion = null;
+    }
+
+    private void CancelarNuevaOpcion() => _opcionNuevaPreguntaId = null;
+
+    private void EditarOpcion(int id)
+    {
+        _opcionEnEdicion = id;
+        _opcionNuevaPreguntaId = null;
+    }
+
+    private void CancelarEdicionOpcion() => _opcionEnEdicion = null;
+
+    private void SolicitarEliminarPregunta(int id)
+    {
+        _preguntaPendienteId = id;
+        SolicitarAccion("eliminar-pregunta");
+    }
+
+    private void SolicitarEliminarOpcion(int id)
+    {
+        _opcionPendienteId = id;
+        SolicitarAccion("eliminar-opcion");
+    }
+
+    private async Task ConfirmarAccionAsync()
+    {
+        if (_procesando || _cargando || _descartado || _accionPendiente is null || _encuesta is null)
+        {
+            return;
+        }
+
+        var encuestaId = _encuesta.Id;
+        var accion = _accionPendiente;
+        _procesando = true;
+        _error = null;
+        _mensaje = null;
+        try
+        {
+            switch (accion)
+            {
+                case "publicar":
+                    await EncuestaService.PublicarAsync(encuestaId);
+                    if (!EsEncuestaActual(encuestaId)) return;
+                    _mensaje = "La encuesta se publicó correctamente.";
+                    break;
+                case "cerrar":
+                    await EncuestaService.CerrarAsync(encuestaId);
+                    if (!EsEncuestaActual(encuestaId)) return;
+                    _mensaje = "La encuesta se cerró correctamente.";
+                    break;
+                case "archivar":
+                    await EncuestaService.ArchivarAsync(encuestaId);
+                    if (!EsEncuestaActual(encuestaId)) return;
+                    Navigation.NavigateTo($"/encuestas?resultado={encuestaId}&tipo=archivada");
+                    return;
+                case "version":
+                    var nueva = await EncuestaService.CrearNuevaVersionAsync(encuestaId);
+                    if (!EsEncuestaActual(encuestaId)) return;
+                    Navigation.NavigateTo($"/encuestas?resultado={nueva.Id}&tipo=nueva-version");
+                    return;
+                case "eliminar-pregunta":
+                    if (_preguntaPendienteId.HasValue)
+                    {
+                        await PreguntaService.EliminarAsync(_preguntaPendienteId.Value);
+                        if (!EsEncuestaActual(encuestaId)) return;
+                        _mensaje = "La pregunta y sus opciones se eliminaron correctamente.";
+                    }
+                    break;
+                case "eliminar-opcion":
+                    if (_opcionPendienteId.HasValue)
+                    {
+                        await PreguntaService.EliminarOpcionAsync(_opcionPendienteId.Value);
+                        if (!EsEncuestaActual(encuestaId)) return;
+                        _mensaje = "La opción se eliminó correctamente.";
+                    }
+                    break;
+            }
+
+            _sincronizacionPendiente = true;
+            await CargarDetalleAsync();
+        }
+        catch (OperationCanceledException) { }
+        catch (ApiClientException exception)
+        {
+            if (!EsEncuestaActual(encuestaId)) return;
+            _error = exception.MensajeConValidaciones;
+            await ActualizarTrasErrorAsync();
+        }
+        finally
+        {
+            _accionPendiente = null;
+            _preguntaPendienteId = null;
+            _opcionPendienteId = null;
+            _procesando = false;
+        }
+    }
+
+
+    private async Task CargarDatosDesdeApiAsync()
+    {
+        _detalleCts?.Cancel();
+        using var cts = new CancellationTokenSource();
+        _detalleCts = cts;
+        var numero = ++_numeroCarga;
+        var encuestaId = Id;
+        _cargando = true;
+        try
+        {
+            var encuesta = await EncuestaService.ObtenerDetalleAsync(encuestaId, cts.Token);
+            var preguntas = await PreguntaService.ObtenerAsync(encuestaId, cts.Token);
+            IReadOnlyList<CatalogoDto> tipos = [];
+            string? errorTipos = null;
+            if (encuesta.Estado == "Borrador")
+            {
+                try { tipos = await EncuestaService.ObtenerTiposPreguntaAsync(cts.Token); }
+                catch (ApiClientException exception) { errorTipos = exception.MensajeConValidaciones; }
+            }
+            cts.Token.ThrowIfCancellationRequested();
+            if (_descartado || numero != _numeroCarga || encuestaId != Id)
+                throw new OperationCanceledException(cts.Token);
+            _encuesta = encuesta;
+            _preguntas = preguntas;
+            _tiposPregunta = tipos;
+            _errorTiposPregunta = errorTipos;
+            if (encuesta.Estado != "Borrador")
+            {
+                _agregarPregunta = false;
+                _preguntaEnEdicion = null;
+                _opcionEnEdicion = null;
+                _opcionNuevaPreguntaId = null;
+            }
+        }
+        catch (ApiClientException) when (cts.IsCancellationRequested || numero != _numeroCarga)
+        {
+            throw new OperationCanceledException(cts.Token);
+        }
+        finally
+        {
+            if (ReferenceEquals(_detalleCts, cts))
+            {
+                _detalleCts = null;
+                _cargando = false;
+            }
+        }
+    }
+
+    private async Task ActualizarDespuesDeCambioAsync()
+    {
+        _error = null;
+        _mensaje = null;
+        try
+        {
+            await CargarDatosDesdeApiAsync();
+            _sincronizacionPendiente = false;
+        }
+        catch (OperationCanceledException) { }
+        catch (ApiClientException exception)
+        {
+            _error = exception.MensajeConValidaciones;
+            _sincronizacionPendiente = true;
+        }
+    }
+
+    private async Task ActualizarTrasErrorAsync()
+    {
+        var encuestaId = Id;
+        var mensaje = _error;
+        try
+        {
+            await CargarDatosDesdeApiAsync();
+            _sincronizacionPendiente = false;
+        }
+        catch (OperationCanceledException) { }
+        catch (ApiClientException)
+        {
+            _sincronizacionPendiente = true;
+        }
+        if (EsEncuestaActual(encuestaId)) _error = mensaje;
+    }
+
+    private bool EsEncuestaActual(int id) => !_descartado && Id == id;
+
+    public void Dispose()
+    {
+        _descartado = true;
+        ++_numeroCarga;
+        _detalleCts?.Cancel();
+    }
+
+    private static bool AdmiteOpciones(string tipo) => tipo is not ("Texto corto" or "Texto largo");
+
+    private static int SiguienteOrden(IEnumerable<int> ordenes) => Math.Max(1, ordenes.DefaultIfEmpty(0).Max() + 1);
+
+
+    private static string FormatoFecha(DateTime fecha) => fecha.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+}

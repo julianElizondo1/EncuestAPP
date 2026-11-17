@@ -1,0 +1,121 @@
+@implements IDisposable
+@page "/login"
+@attribute [AllowAnonymous]
+@layout Layout.AuthLayout
+@inject IAuthService AuthService
+@inject ISesionService SesionService
+@inject NavigationManager Navigation
+@inject ILogger<Login> Logger
+
+<PageTitle>Iniciar sesión | EncuestAPP</PageTitle>
+
+<section class="auth-card" aria-labelledby="login-title">
+    <header class="auth-card-header">
+        <span class="auth-eyebrow">BIENVENIDO DE NUEVO</span>
+        <h1 id="login-title" class="auth-title">Iniciá sesión</h1>
+        <p class="auth-subtitle">Ingresá con tu cuenta para continuar en EncuestAPP.</p>
+    </header>
+
+    @if (_error is not null)
+    {
+        <div class="auth-alert" role="alert">
+            <svg class="auth-alert-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" /><path d="M12 8v4m0 4h.01" /></svg>
+            <div>
+                <div>@_error</div>
+                @if (_validationErrors.Count > 0)
+                {
+                    <ul>
+                        @foreach (var validationError in _validationErrors)
+                        {
+                            <li>@validationError</li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    }
+
+    <EditForm class="auth-form" Model="_solicitud" OnValidSubmit="IniciarSesionAsync">
+        <DataAnnotationsValidator />
+        <fieldset class="auth-fields" disabled="@_cargando">
+        <div class="auth-field">
+            <label for="email" class="auth-label">Correo electrónico</label>
+            <div class="auth-input-wrap">
+                <svg class="auth-input-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 6 8-6" /></svg>
+                <InputText id="email" type="email" class="auth-input" placeholder="nombre@ejemplo.com" autocomplete="email" @bind-Value="_solicitud.Email" />
+            </div>
+            <ValidationMessage For="() => _solicitud.Email" class="auth-validation" />
+        </div>
+        <div class="auth-field">
+            <label for="password" class="auth-label">Contraseña</label>
+            <div class="auth-input-wrap">
+                <svg class="auth-input-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2" /></svg>
+                <InputText id="password" type="password" class="auth-input" placeholder="Tu contraseña" autocomplete="current-password" @bind-Value="_solicitud.Contrasena" />
+            </div>
+            <ValidationMessage For="() => _solicitud.Contrasena" class="auth-validation" />
+        </div>
+        <button type="submit" class="auth-submit" disabled="@_cargando">
+            @if (_cargando)
+            {
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                <span>Ingresando...</span>
+            }
+            else
+            {
+                <span>Iniciar sesión</span>
+                <svg class="auth-submit-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14m-6-6 6 6-6 6" /></svg>
+            }
+        </button>
+        </fieldset>
+    </EditForm>
+
+    <p class="auth-switch">
+        ¿No tenés cuenta? <NavLink class="auth-link" href="/registro">Crear cuenta</NavLink>
+    </p>
+</section>
+
+@code {
+    private readonly LoginRequestDto _solicitud = new();
+    private bool _cargando;
+    private bool _descartado;
+    private string? _error;
+    private IReadOnlyList<string> _validationErrors = [];
+
+    protected override void OnInitialized()
+    {
+        if (SesionService.EstaAutenticado)
+        {
+            if (!_descartado) Navigation.NavigateTo("/", replace: true);
+        }
+    }
+
+    private async Task IniciarSesionAsync()
+    {
+        if (_cargando || _descartado) return;
+        _cargando = true;
+        _error = null;
+        _validationErrors = [];
+
+        try
+        {
+            await AuthService.IniciarSesionAsync(_solicitud);
+            if (!_descartado) Navigation.NavigateTo("/", replace: true);
+        }
+        catch (ApiClientException exception)
+        {
+            _error = exception.Message;
+            _validationErrors = exception.ValidationErrors;
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Ocurrió un error inesperado al iniciar sesión.");
+            _error = "No se pudo completar el inicio de sesión. Intentá nuevamente.";
+        }
+        finally
+        {
+            _cargando = false;
+        }
+    }
+    public void Dispose() => _descartado = true;
+
+}

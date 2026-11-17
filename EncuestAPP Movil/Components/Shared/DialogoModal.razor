@@ -1,0 +1,53 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<dialog @ref="_dialogo" class="app-dialog" aria-labelledby="@_tituloId" aria-busy="@Ocupado">
+    <div class="app-dialog-header">
+        <h2 id="@_tituloId">@Titulo</h2>
+        <button type="button" class="btn-close" aria-label="Cerrar diálogo" disabled="@Ocupado" @onclick="SolicitarCerrarAsync"></button>
+    </div>
+    <div class="app-dialog-body">@ChildContent</div>
+    @if (Acciones is not null) { <div class="app-dialog-actions">@Acciones</div> }
+</dialog>
+
+@code {
+    [Parameter, EditorRequired] public string Titulo { get; set; } = string.Empty;
+    [Parameter] public bool Ocupado { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? Acciones { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    private readonly string _tituloId = $"dialogo-{Guid.NewGuid():N}";
+    private ElementReference _dialogo;
+    private IJSObjectReference? _modulo;
+    private DotNetObjectReference<DialogoModal>? _referencia;
+    private bool _descartado;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _descartado) return;
+        var modulo = await JS.InvokeAsync<IJSObjectReference>("import", "./js/dialogos.js");
+        if (_descartado) { await modulo.DisposeAsync(); return; }
+        _modulo = modulo;
+        _referencia = DotNetObjectReference.Create(this);
+        await _modulo.InvokeVoidAsync("abrir", _dialogo, _referencia, _tituloId);
+    }
+
+    [JSInvokable]
+    public Task SolicitarCerrarAsync() => Ocupado || _descartado ? Task.CompletedTask : OnClose.InvokeAsync();
+
+    public async ValueTask DisposeAsync()
+    {
+        _descartado = true;
+        try
+        {
+            if (_modulo is not null)
+            {
+                await _modulo.InvokeVoidAsync("cerrar", _tituloId);
+                await _modulo.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+        finally { _referencia?.Dispose(); }
+    }
+}

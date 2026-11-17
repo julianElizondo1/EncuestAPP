@@ -1,0 +1,159 @@
+@using EncuestAPP_Movil.Services.Exportacion
+@implements IDisposable
+@inject ServicioArchivosExportados ArchivosExportados
+@inject ILogger<ExportarResultados> Logger
+
+<section class="export-panel" aria-labelledby="exportar-resultados">
+    <h2 id="exportar-resultados">Exportar resultados</h2>
+    <p>Generá informes con los datos consultados, conservando los porcentajes de la API.</p>
+    <div class="export-actions">
+        <button type="button" class="btn btn-outline-primary" disabled="@(_ocupado || _excel is not null)" @onclick="() => GenerarAsync(false)">Generar Excel</button>
+        <button type="button" class="btn btn-outline-primary" disabled="@(_ocupado || _pdf is not null)" @onclick="() => GenerarAsync(true)">Generar PDF</button>
+        @if (_generando)
+        {
+            <button type="button" class="btn btn-outline-secondary" @onclick="Cancelar">Cancelar</button>
+        }
+    </div>
+    @if (_ocupado)
+    {
+        <p role="status"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>@(_generando ? "Generando informe..." : "Procesando archivo...")</p>
+    }
+    @foreach (var archivo in Archivos)
+    {
+        <div class="export-actions">
+            <strong>@archivo.Formato generado</strong>
+            <button type="button" class="btn btn-outline-primary" disabled="@_ocupado" @onclick="() => GuardarAsync(archivo.Ruta)">Guardar @archivo.Formato</button>
+            <button type="button" class="btn btn-outline-primary" disabled="@_ocupado" @onclick="() => CompartirAsync(archivo.Ruta)">Compartir @archivo.Formato</button>
+        </div>
+    }
+    @if (_mensaje is not null && _archivoGuardado is null) { <p role="status">@_mensaje</p> }
+    @if (_error is not null && _archivoGuardado is null) { <p class="export-error" role="alert">@_error</p> }
+</section>
+
+@if (_archivoGuardado is { } guardado)
+{
+    <DialogoModal Titulo="Archivo guardado" Ocupado="_ocupado" OnClose="CerrarConfirmacion">
+        <ChildContent>
+            <p>El informe se guardó correctamente en el destino que elegiste.</p>
+            <p class="export-saved-name">@guardado.Nombre</p>
+            @if (_ocupado) { <p role="status">Procesando archivo...</p> }
+            @if (_mensaje is not null) { <p role="status">@_mensaje</p> }
+            @if (_error is not null) { <p class="export-error" role="alert">@_error</p> }
+        </ChildContent>
+        <Acciones>
+            <button type="button" class="btn btn-primary" autofocus disabled="@_ocupado" @onclick="AbrirGuardadoAsync">Abrir archivo</button>
+            <button type="button" class="btn btn-outline-primary" disabled="@_ocupado" @onclick="CompartirGuardadoAsync">Compartir</button>
+            <button type="button" class="btn btn-outline-secondary" disabled="@_ocupado" @onclick="CerrarConfirmacion">Cerrar</button>
+        </Acciones>
+    </DialogoModal>
+}
+
+@code {
+    [Parameter, EditorRequired] public InformeResultados Informe { get; set; } = default!;
+    private ArchivoGuardado? _archivoGuardado;
+    private string? _origenGuardado;
+    private string? _excel;
+    private string? _pdf;
+    private string? _mensaje;
+    private string? _error;
+    private bool _ocupado;
+    private bool _generando;
+    private bool _descartado;
+    private CancellationTokenSource? _cts;
+    private IEnumerable<(string Formato, string Ruta)> Archivos
+    {
+        get
+        {
+            if (_excel is not null) yield return ("Excel", _excel);
+            if (_pdf is not null) yield return ("PDF", _pdf);
+        }
+    }
+
+    private Task GenerarAsync(bool esPdf) => EjecutarAsync(async token =>
+    {
+        if (esPdf ? _pdf is not null : _excel is not null) return;
+        _generando = true;
+        var informe = Informe with { GeneradoEn = DateTimeOffset.Now };
+        var archivo = await ArchivosExportados.GenerarAsync(informe, esPdf, token);
+        token.ThrowIfCancellationRequested();
+        if (esPdf) _pdf = archivo; else _excel = archivo;
+        _mensaje = "Informe generado. Podés guardarlo o compartirlo.";
+    });
+
+    private Task GuardarAsync(string ruta) => EjecutarAsync(async token =>
+    {
+        // Una cancelación nunca conserva la confirmación de un guardado anterior.
+        _archivoGuardado = null;
+        _origenGuardado = null;
+        var destino = await ArchivosExportados.GuardarAsync(ruta, token);
+        token.ThrowIfCancellationRequested();
+        if (_descartado) return;
+        if (destino is null)
+        {
+            _mensaje = "Guardado cancelado. No se guardó un nuevo archivo.";
+            return;
+        }
+        _archivoGuardado = destino;
+        _origenGuardado = ruta;
+        _mensaje = null;
+    });
+
+    private Task CompartirAsync(string ruta) => EjecutarAsync(async token =>
+    {
+        token.ThrowIfCancellationRequested();
+        await ArchivosExportados.CompartirAsync(ruta);
+        _mensaje = "Se abrió el menú para compartir el informe.";
+    });
+
+    private Task AbrirGuardadoAsync() => EjecutarAsync(async token =>
+    {
+        if (_archivoGuardado is null) return;
+        token.ThrowIfCancellationRequested();
+        try
+        {
+            var abierto = await ArchivosExportados.AbrirAsync(_archivoGuardado);
+            if (abierto)
+                _mensaje = "Se solicitó abrir el archivo con una aplicación compatible.";
+            else
+                _error = "No se pudo abrir el archivo con una aplicación compatible. Podés instalar un lector para este formato o usar Compartir.";
+        }
+        catch (Exception exception)
+        {
+            Logger.LogWarning(exception, "No se pudo abrir el documento guardado.");
+            _error = "No se pudo acceder al archivo guardado. Puede haberse movido, eliminado o perdido el permiso de acceso. Podés volver a guardarlo o usar Compartir.";
+        }
+    });
+
+    private Task CompartirGuardadoAsync() => _origenGuardado is { } origen
+        ? CompartirAsync(origen) : Task.CompletedTask;
+
+    private void CerrarConfirmacion()
+    {
+        if (_ocupado) return;
+        _archivoGuardado = null;
+        _origenGuardado = null;
+        _error = null;
+        _mensaje = "El informe se guardó correctamente.";
+    }
+
+    private async Task EjecutarAsync(Func<CancellationToken, Task> accion)
+    {
+        if (_ocupado || _descartado) return;
+        _ocupado = true;
+        _mensaje = null;
+        _error = null;
+        using var cts = new CancellationTokenSource();
+        _cts = cts;
+        try { await accion(cts.Token); }
+        catch (OperationCanceledException) { _mensaje = "Exportación cancelada."; }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "No se pudo completar la exportación de resultados.");
+            _error = "No se pudo completar la exportación. Revisá el espacio disponible y el destino elegido e intentá nuevamente.";
+        }
+        finally { _ocupado = false; _generando = false; _cts = null; }
+    }
+
+    private void Cancelar() => _cts?.Cancel();
+    public void Dispose() { _descartado = true; _cts?.Cancel(); }
+}

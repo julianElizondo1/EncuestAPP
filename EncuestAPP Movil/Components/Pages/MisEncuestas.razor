@@ -1,0 +1,364 @@
+@page "/encuestas"
+@attribute [Authorize]
+@implements IDisposable
+@inject IEncuestaService EncuestaService
+
+<PageTitle>Mis encuestas | EncuestAPP</PageTitle>
+
+<div class="survey-page">
+    <header class="survey-page-header">
+        <div class="survey-page-copy">
+            <span class="survey-page-eyebrow">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5h10A1.5 1.5 0 0 1 18.5 6v12A1.5 1.5 0 0 1 17 19.5H7A1.5 1.5 0 0 1 5.5 18V6A1.5 1.5 0 0 1 7 4.5Z" /><path d="M9 9h6M9 12.5h6M9 16h3" /></svg>
+                Encuestas
+            </span>
+            <h1>Mis Encuestas</h1>
+            <p>Buscá, revisá y administrá las encuestas de tu cuenta.</p>
+        </div>
+        <NavLink class="survey-create-button" href="/encuestas/nueva">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14m-7-7h14" /></svg>
+            <span>Crear encuesta</span>
+        </NavLink>
+    </header>
+
+    @if (ResultadoId.HasValue && TextoResultado is not null)
+    {
+        <div class="survey-notice survey-notice-success" role="status">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" /><path d="m8 12 2.5 2.5L16 9" /></svg>
+            <span class="survey-notice-copy">@TextoResultado</span>
+            <NavLink class="survey-notice-action" href="@($"/encuestas/{ResultadoId.Value}")">Ver encuesta</NavLink>
+        </div>
+    }
+
+    @if (_errorCatalogos is not null)
+    {
+        <div class="survey-notice survey-notice-warning" role="alert">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v4m0 3h.01" /></svg>
+            <div class="survey-notice-copy">
+                <strong>No se pudieron cargar los filtros</strong>
+                <span>@_errorCatalogos</span>
+            </div>
+            <button type="button" class="survey-notice-action" @onclick="CargarCatalogosAsync" disabled="@_cargandoCatalogos">Reintentar catálogos</button>
+        </div>
+    }
+
+    @if (_error is not null)
+    {
+        <div class="survey-notice survey-notice-danger" role="alert">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" /><path d="M12 8v4m0 4h.01" /></svg>
+            <span class="survey-notice-copy">@_error</span>
+        </div>
+    }
+
+    <section class="survey-filter-panel" aria-label="Filtros de encuestas">
+        <div class="survey-filter-header">
+            <div class="survey-filter-heading">
+                <span class="survey-filter-heading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 4.5 4.5" /></svg></span>
+                <div>
+                    <h2>Buscar y filtrar</h2>
+                    <p>Encontrá rápidamente una encuesta de tu listado.</p>
+                </div>
+            </div>
+            <button type="button" class="survey-refresh-button" @onclick="ActualizarAsync" disabled="@_cargando">
+                @if (_cargando)
+                {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                }
+                else
+                {
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M5.6 9a7 7 0 0 1 11.6-2L20 12M4 12l2.8 5a7 7 0 0 0 11.6-2" /></svg>
+                }
+                <span>Actualizar listado</span>
+            </button>
+        </div>
+
+        <div class="survey-filter-grid">
+            <div class="survey-filter-field survey-filter-search">
+                <label for="buscar-titulo">Título</label>
+                <div class="survey-input-wrap">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 4.5 4.5" /></svg>
+                    <input id="buscar-titulo" class="survey-control" type="search" value="@_titulo" @oninput="TituloCambio" placeholder="Buscar por título" />
+                </div>
+            </div>
+            <div class="survey-filter-field">
+                <label for="filtrar-estado">Estado</label>
+                <select id="filtrar-estado" class="survey-control survey-select-control" value="@_estado" @onchange="EstadoCambio" disabled="@(_estados.Count == 0)">
+                    <option value="">Todos los estados</option>
+                    @foreach (var estado in _estados)
+                    {
+                        <option value="@estado.Nombre">@estado.Nombre</option>
+                    }
+                </select>
+            </div>
+            <div class="survey-filter-field">
+                <label for="filtrar-categoria">Categoría</label>
+                <select id="filtrar-categoria" class="survey-control survey-select-control" value="@_categoriaId" @onchange="CategoriaCambio" disabled="@(_categorias.Count == 0)">
+                    <option value="">Todas las categorías</option>
+                    @foreach (var categoria in _categorias)
+                    {
+                        <option value="@categoria.Id">@categoria.Nombre</option>
+                    }
+                </select>
+            </div>
+            <div class="survey-filter-field survey-page-size-field">
+                <label for="tamano-pagina">Elementos por página</label>
+                <select id="tamano-pagina" class="survey-control survey-select-control" value="@_tamanoPagina" @onchange="TamanoPaginaCambio">
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                </select>
+            </div>
+        </div>
+    </section>
+
+    @if (_cargando)
+    {
+        <div class="survey-loading" role="status">
+            <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+            <span>Consultando encuestas...</span>
+        </div>
+    }
+
+    @if (_pagina is not null)
+    {
+        @if (_pagina.Elementos.Count == 0)
+        {
+            <section class="survey-empty-state" aria-live="polite">
+                <span class="survey-empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 4.5h10A1.5 1.5 0 0 1 18.5 6v12A1.5 1.5 0 0 1 17 19.5H7A1.5 1.5 0 0 1 5.5 18V6A1.5 1.5 0 0 1 7 4.5Z" /><path d="M9 9h6M9 12.5h6M9 16h3" /></svg></span>
+                <h2>@(string.IsNullOrWhiteSpace(_titulo) && string.IsNullOrEmpty(_estado) && !_categoriaId.HasValue ? "Todavía no hay encuestas" : "No encontramos coincidencias")</h2>
+                <p>@(string.IsNullOrWhiteSpace(_titulo) && string.IsNullOrEmpty(_estado) && !_categoriaId.HasValue ? "Creá tu primera encuesta para empezar a reunir opiniones." : "Probá ajustar la búsqueda o los filtros para ver otros resultados.")</p>
+                @if (string.IsNullOrWhiteSpace(_titulo) && string.IsNullOrEmpty(_estado) && !_categoriaId.HasValue)
+                {
+                    <NavLink class="survey-create-button" href="/encuestas/nueva">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14m-7-7h14" /></svg>
+                        <span>Crear encuesta</span>
+                    </NavLink>
+                }
+            </section>
+        }
+        else
+        {
+            <section class="survey-results" aria-label="Listado de encuestas">
+                <div class="survey-results-summary">
+                    <p><strong>@_pagina.TotalElementos</strong> encuesta(s) en total</p>
+                    <span>Página @_pagina.Pagina de @_pagina.TotalPaginas</span>
+                </div>
+                <div class="survey-card-grid">
+                    @foreach (var encuesta in _pagina.Elementos)
+                    {
+                        <div class="survey-card-item" @key="encuesta.Id">
+                            <EncuestaCard Encuesta="encuesta" />
+                        </div>
+                    }
+                </div>
+                @if (_pagina.TotalPaginas > 1)
+                {
+                    <nav class="survey-pagination" aria-label="Paginación de encuestas">
+                        <button type="button" class="survey-pagination-button" @onclick="PaginaAnteriorAsync" disabled="@(_cargando || _pagina.Pagina <= 1)">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m15 18-6-6 6-6" /></svg>
+                            <span>Anterior</span>
+                        </button>
+                        <span class="survey-pagination-indicator">Página <strong>@_pagina.Pagina</strong> de @_pagina.TotalPaginas</span>
+                        <button type="button" class="survey-pagination-button" @onclick="PaginaSiguienteAsync" disabled="@(_cargando || _pagina.Pagina >= _pagina.TotalPaginas)">
+                            <span>Siguiente</span>
+                            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6" /></svg>
+                        </button>
+                    </nav>
+                }
+            </section>
+        }
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "resultado")]
+    public int? ResultadoId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "tipo")]
+    public string? TipoResultado { get; set; }
+
+    private IReadOnlyList<CatalogoDto> _estados = [];
+    private IReadOnlyList<CatalogoDto> _categorias = [];
+    private PaginaDto<EncuestaListaDto>? _pagina;
+    private CancellationTokenSource? _consultaCts;
+    private int _paginaActual = 1;
+    private int _tamanoPagina = 20;
+    private int? _categoriaId;
+    private string? _estado;
+    private string _titulo = string.Empty;
+    private string? _error;
+    private string? _errorCatalogos;
+    private bool _cargando;
+    private bool _descartado;
+    private bool _cargandoCatalogos;
+    private CancellationTokenSource? _catalogosCts;
+    private long _numeroConsulta;
+
+    private string? TextoResultado => TipoResultado switch
+    {
+        "creada" => "La encuesta se creó como borrador y podés revisarla desde su detalle.",
+        "actualizada" => "Los datos de la encuesta se actualizaron y podés revisarla desde su detalle.",
+        "archivada" => "La encuesta se archivó y podés revisarla desde su detalle.",
+        "nueva-version" => "Se creó una nueva versión en borrador y podés revisarla desde su detalle.",
+        _ => null
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarCatalogosAsync();
+        await ConsultarAsync(false, true);
+    }
+
+    private async Task CargarCatalogosAsync()
+    {
+        if (_cargandoCatalogos || _descartado) return;
+        using var cts = new CancellationTokenSource();
+        _catalogosCts = cts;
+        _cargandoCatalogos = true;
+        _errorCatalogos = null;
+        try
+        {
+            var estados = await EncuestaService.ObtenerEstadosAsync(cts.Token);
+            var categorias = await EncuestaService.ObtenerCategoriasAsync(cts.Token);
+            cts.Token.ThrowIfCancellationRequested();
+            _estados = estados;
+            _categorias = categorias;
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested) { }
+        catch (ApiClientException exception)
+        {
+            if (!_descartado) _errorCatalogos = exception.MensajeConValidaciones;
+        }
+        finally
+        {
+            if (ReferenceEquals(_catalogosCts, cts)) _catalogosCts = null;
+            _cargandoCatalogos = false;
+        }
+    }
+
+    private async Task TituloCambio(ChangeEventArgs args)
+    {
+        var nuevoTitulo = args.Value?.ToString() ?? string.Empty;
+        if (_titulo == nuevoTitulo)
+        {
+            return;
+        }
+        _titulo = nuevoTitulo;
+        _paginaActual = 1;
+        await ConsultarAsync(true, true);
+    }
+
+    private async Task EstadoCambio(ChangeEventArgs args)
+    {
+        var nuevoEstado = args.Value?.ToString();
+        if (_estado == nuevoEstado)
+        {
+            return;
+        }
+        _estado = nuevoEstado;
+        await CambiarFiltrosAsync();
+    }
+
+    private async Task CategoriaCambio(ChangeEventArgs args)
+    {
+        int? nuevaCategoria = int.TryParse(args.Value?.ToString(), out var id) ? id : null;
+        if (_categoriaId == nuevaCategoria)
+        {
+            return;
+        }
+        _categoriaId = nuevaCategoria;
+        await CambiarFiltrosAsync();
+    }
+
+    private async Task TamanoPaginaCambio(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var tamano) || tamano == _tamanoPagina)
+        {
+            return;
+        }
+        _tamanoPagina = tamano;
+        await CambiarFiltrosAsync();
+    }
+
+    private async Task CambiarFiltrosAsync()
+    {
+        _paginaActual = 1;
+        await ConsultarAsync(false, true);
+    }
+
+    private Task ActualizarAsync() => ConsultarAsync(false, false);
+
+    private async Task PaginaAnteriorAsync()
+    {
+        if (_pagina is not null && _pagina.Pagina > 1)
+        {
+            _paginaActual = _pagina.Pagina - 1;
+            await ConsultarAsync(false, true);
+        }
+    }
+
+    private async Task PaginaSiguienteAsync()
+    {
+        if (_pagina is not null && _pagina.Pagina < _pagina.TotalPaginas)
+        {
+            _paginaActual = _pagina.Pagina + 1;
+            await ConsultarAsync(false, true);
+        }
+    }
+
+    private async Task ConsultarAsync(bool esperarBusqueda, bool limpiarResultados)
+    {
+        if (_descartado) return;
+        _consultaCts?.Cancel();
+        using var cts = new CancellationTokenSource();
+        _consultaCts = cts;
+        var numero = ++_numeroConsulta;
+        if (limpiarResultados)
+        {
+            _pagina = null;
+        }
+        _error = null;
+        _cargando = true;
+
+        try
+        {
+            if (esperarBusqueda)
+            {
+                await Task.Delay(350, cts.Token);
+            }
+            var resultado = await EncuestaService.ObtenerPropiasAsync(
+                _estado, _categoriaId, _titulo, _paginaActual, _tamanoPagina, cts.Token);
+            if (!cts.IsCancellationRequested && numero == _numeroConsulta)
+            {
+                _pagina = resultado;
+                _paginaActual = resultado.Pagina;
+            }
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+        }
+        catch (ApiClientException exception)
+        {
+            if (!cts.IsCancellationRequested && numero == _numeroConsulta)
+            {
+                _error = exception.Message;
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_consultaCts, cts)) _consultaCts = null;
+            if (numero == _numeroConsulta)
+            {
+                _cargando = false;
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        _descartado = true;
+        ++_numeroConsulta;
+        _catalogosCts?.Cancel();
+        _consultaCts?.Cancel();
+    }
+}

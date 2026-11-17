@@ -1,0 +1,686 @@
+.survey-page {
+    display: grid;
+    min-width: 0;
+    max-width: 1440px;
+    gap: clamp(1.25rem, 2.5vw, 1.75rem);
+    margin: 0 auto;
+}
+
+.survey-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 0.25rem 0 0.5rem;
+}
+
+.survey-page-copy {
+    min-width: 0;
+}
+
+.survey-page-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-bottom: 0.55rem;
+    color: var(--app-color-warning);
+    font-size: var(--app-font-size-xs);
+    font-weight: 750;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+.survey-page-eyebrow svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: var(--app-color-accent);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.7;
+}
+
+.survey-page-header h1 {
+    margin: 0;
+    color: var(--app-color-navy);
+    font-size: var(--app-font-size-4xl);
+    font-weight: 750;
+    letter-spacing: -0.045em;
+    line-height: 1.12;
+}
+
+.survey-page-header p {
+    margin: 0.55rem 0 0;
+    color: var(--app-color-text-muted);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.survey-create-button {
+    display: inline-flex;
+    min-height: 2.9rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    padding: 0.7rem 1rem;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    color: var(--app-color-navy);
+    background: var(--app-color-accent);
+    box-shadow: 0 6px 16px rgb(245 158 11 / 20%);
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: transform 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.survey-create-button:hover {
+    transform: translateY(-1px);
+    color: var(--app-color-navy);
+    background: #fbbf24;
+    box-shadow: 0 9px 20px rgb(245 158 11 / 26%);
+}
+
+.survey-create-button svg {
+    width: 1.15rem;
+    height: 1.15rem;
+    flex: 0 0 auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 2;
+}
+
+.survey-create-button:focus-visible,
+.survey-refresh-button:focus-visible,
+.survey-notice-action:focus-visible,
+.survey-pagination-button:focus-visible {
+    outline: 3px solid rgb(245 158 11 / 55%);
+    outline-offset: 3px;
+}
+
+.survey-notice {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.95rem 1rem;
+    border: 1px solid;
+    border-radius: 14px;
+    font-size: 0.9rem;
+}
+
+.survey-notice > svg {
+    width: 1.3rem;
+    height: 1.3rem;
+    flex: 0 0 1.3rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+
+.survey-notice-copy {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow-wrap: anywhere;
+}
+
+.survey-notice-warning,
+.survey-notice-danger {
+    align-items: flex-start;
+}
+
+.survey-notice-copy strong,
+.survey-notice-copy span {
+    display: block;
+}
+
+.survey-notice-success {
+    border-color: var(--app-color-success-border);
+    color: var(--app-color-success);
+    background: var(--app-color-success-surface);
+}
+
+.survey-notice-warning {
+    border-color: var(--app-color-warning-border);
+    color: var(--app-color-warning);
+    background: var(--app-color-warning-surface);
+}
+
+.survey-notice-danger {
+    border-color: var(--app-color-danger-border);
+    color: var(--app-color-danger);
+    background: var(--app-color-danger-surface);
+}
+
+.survey-notice-action {
+    display: inline-flex;
+    min-height: 2.5rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    padding: 0.45rem 0.8rem;
+    border: 1px solid currentColor;
+    border-radius: 10px;
+    color: inherit;
+    background: #fff;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.survey-notice-action:hover {
+    color: inherit;
+    filter: brightness(0.97);
+}
+
+.survey-filter-panel {
+    min-width: 0;
+    padding: clamp(1rem, 2vw, 1.5rem);
+    border: 1px solid var(--app-color-border);
+    border-radius: 18px;
+    background: var(--app-color-surface);
+    box-shadow: var(--app-shadow-sm);
+}
+
+.survey-filter-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.15rem;
+}
+
+.survey-filter-heading {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.survey-filter-heading-icon {
+    display: grid;
+    width: 2.65rem;
+    height: 2.65rem;
+    flex: 0 0 2.65rem;
+    place-items: center;
+    border-radius: 13px;
+    color: var(--app-color-navy);
+    background: #eef2ff;
+}
+
+.survey-filter-heading-icon svg {
+    width: 1.35rem;
+    height: 1.35rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+
+.survey-filter-heading h2 {
+    margin: 0;
+    color: var(--app-color-navy);
+    font-size: 1.05rem;
+    font-weight: 750;
+}
+
+.survey-filter-heading p {
+    margin: 0.2rem 0 0;
+    color: var(--app-color-text-muted);
+    font-size: 0.82rem;
+}
+
+.survey-refresh-button {
+    display: inline-flex;
+    min-height: 2.75rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.85rem;
+    border: 1px solid var(--app-color-border);
+    border-radius: 11px;
+    color: var(--app-color-navy);
+    background: var(--app-color-surface);
+    font-size: 0.84rem;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.survey-refresh-button:hover:not(:disabled) {
+    border-color: #cbd5e1;
+    background: var(--app-color-background);
+}
+
+.survey-refresh-button:disabled {
+    cursor: wait;
+    opacity: 0.7;
+}
+
+.survey-refresh-button svg {
+    width: 1.05rem;
+    height: 1.05rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+
+.survey-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.survey-filter-search {
+    grid-column: span 2;
+}
+
+.survey-filter-field {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.survey-filter-field label {
+    color: var(--app-color-text);
+    font-size: 0.82rem;
+    font-weight: 650;
+}
+
+.survey-input-wrap {
+    position: relative;
+}
+
+.survey-input-wrap > svg {
+    position: absolute;
+    top: 50%;
+    left: 0.9rem;
+    width: 1.15rem;
+    height: 1.15rem;
+    transform: translateY(-50%);
+    fill: none;
+    stroke: #94a3b8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+    pointer-events: none;
+}
+
+.survey-control {
+    width: 100%;
+    min-width: 0;
+    min-height: 2.9rem;
+    padding: 0.65rem 0.8rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 11px;
+    color: var(--app-color-text);
+    background-color: #fff;
+    font: inherit;
+    font-size: 0.88rem;
+    transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.survey-input-wrap .survey-control {
+    padding-left: 2.6rem;
+}
+
+.survey-control::placeholder {
+    color: #94a3b8;
+}
+
+.survey-control:hover:not(:focus):not(:disabled) {
+    border-color: #94a3b8;
+}
+
+.survey-control:focus {
+    border-color: var(--app-color-navy);
+    outline: none;
+    box-shadow: var(--app-focus-ring);
+}
+
+.survey-control:disabled {
+    color: #64748b;
+    background-color: #f1f5f9;
+    cursor: not-allowed;
+    opacity: 1;
+}
+
+.survey-select-control {
+    cursor: pointer;
+}
+
+.survey-loading {
+    display: flex;
+    min-height: 4.5rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.7rem;
+    border: 1px dashed var(--app-color-border);
+    border-radius: 14px;
+    color: var(--app-color-text-muted);
+    background: var(--app-color-surface);
+    font-size: 0.9rem;
+}
+
+.survey-results {
+    min-width: 0;
+}
+
+.survey-results-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.9rem;
+    color: var(--app-color-text-muted);
+    font-size: 0.85rem;
+}
+
+.survey-results-summary p {
+    margin: 0;
+}
+
+.survey-results-summary strong {
+    color: var(--app-color-navy);
+    font-size: 1rem;
+    font-weight: 750;
+}
+
+.survey-results-summary > span {
+    padding: 0.35rem 0.65rem;
+    border-radius: var(--app-radius-pill);
+    background: var(--app-color-surface-muted);
+    font-size: 0.76rem;
+    font-weight: 650;
+}
+
+.survey-card-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.survey-card-item {
+    min-width: 0;
+}
+
+.survey-card-grid ::deep .card {
+    height: 100%;
+    overflow: hidden;
+    border: 1px solid var(--app-color-border) !important;
+    border-radius: 18px;
+    background: var(--app-color-surface);
+    box-shadow: var(--app-shadow-sm) !important;
+    transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.survey-card-grid ::deep .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1.25rem rgb(15 23 42 / 9%) !important;
+}
+
+.survey-card-grid ::deep .card-body {
+    gap: 0.25rem;
+}
+
+.survey-card-grid ::deep h2 {
+    min-width: 0;
+    color: var(--app-color-navy);
+    font-size: 1.05rem;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.survey-card-grid ::deep .badge {
+    flex: 0 0 auto;
+    padding: 0.4rem 0.65rem;
+    border-radius: var(--app-radius-pill);
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.survey-card-grid ::deep .badge.text-bg-warning {
+    color: #713f12 !important;
+}
+
+.survey-card-grid ::deep p {
+    color: var(--app-color-text-muted);
+    font-size: 0.88rem;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+}
+
+.survey-card-grid ::deep dl {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    column-gap: 0.75rem;
+    row-gap: 0.4rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--app-color-surface-muted);
+}
+
+.survey-card-grid ::deep dt {
+    color: var(--app-color-text-muted) !important;
+    font-weight: 500;
+}
+
+.survey-card-grid ::deep dd {
+    min-width: 0;
+    margin: 0 !important;
+    color: var(--app-color-text);
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+.survey-card-grid ::deep .btn {
+    min-height: 2.75rem;
+    flex: 1 1 0;
+    padding: 0.55rem 0.7rem;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 650;
+    white-space: normal;
+}
+
+.survey-card-grid ::deep .btn-outline-primary {
+    border-color: var(--app-color-border);
+    color: var(--app-color-navy);
+}
+
+.survey-card-grid ::deep .btn-outline-primary:hover {
+    border-color: var(--app-color-navy);
+    color: var(--app-color-white);
+    background: var(--app-color-navy);
+}
+
+.survey-empty-state {
+    display: flex;
+    min-height: 17rem;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.25rem;
+    border: 1px dashed #cbd5e1;
+    border-radius: 18px;
+    background: var(--app-color-surface);
+    text-align: center;
+}
+
+.survey-empty-icon {
+    display: grid;
+    width: 3.5rem;
+    height: 3.5rem;
+    place-items: center;
+    margin-bottom: 1rem;
+    border-radius: 18px;
+    color: var(--app-color-navy);
+    background: #eef2ff;
+}
+
+.survey-empty-icon svg {
+    width: 1.8rem;
+    height: 1.8rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.7;
+}
+
+.survey-empty-state h2 {
+    margin: 0;
+    color: var(--app-color-navy);
+    font-size: 1.2rem;
+    font-weight: 750;
+}
+
+.survey-empty-state p {
+    max-width: 30rem;
+    margin: 0.55rem 0 1.2rem;
+    color: var(--app-color-text-muted);
+    font-size: 0.9rem;
+    line-height: 1.55;
+}
+
+.survey-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding: 0.9rem;
+    border: 1px solid var(--app-color-border);
+    border-radius: 14px;
+    background: var(--app-color-surface);
+}
+
+.survey-pagination-button {
+    display: inline-flex;
+    min-width: 7.5rem;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--app-color-border);
+    border-radius: 10px;
+    color: var(--app-color-navy);
+    background: #fff;
+    font-size: 0.84rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.survey-pagination-button:hover:not(:disabled) {
+    border-color: var(--app-color-navy);
+    color: var(--app-color-white);
+    background: var(--app-color-navy);
+}
+
+.survey-pagination-button:disabled {
+    color: #94a3b8;
+    background: #f8fafc;
+    cursor: not-allowed;
+}
+
+.survey-pagination-button svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+
+.survey-pagination-indicator {
+    color: var(--app-color-text-muted);
+    font-size: 0.84rem;
+    text-align: center;
+}
+
+.survey-pagination-indicator strong {
+    color: var(--app-color-navy);
+}
+
+@media (max-width: 1100px) {
+    .survey-filter-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .survey-filter-search {
+        grid-column: span 2;
+    }
+}
+
+@media (max-width: 760px) {
+    .survey-card-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 576px) {
+    .survey-page-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .survey-create-button {
+        width: 100%;
+    }
+
+    .survey-filter-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .survey-refresh-button {
+        width: 100%;
+    }
+
+    .survey-filter-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.85rem;
+    }
+
+    .survey-filter-search {
+        grid-column: auto;
+    }
+
+    .survey-notice {
+        flex-wrap: wrap;
+    }
+
+    .survey-notice-action {
+        margin-left: 2.1rem;
+    }
+
+    .survey-results-summary {
+        align-items: flex-start;
+    }
+
+    .survey-pagination {
+        gap: 0.45rem;
+        padding: 0.65rem;
+    }
+
+    .survey-pagination-button {
+        min-width: 0;
+        padding: 0.55rem;
+    }
+
+    .survey-pagination-indicator {
+        font-size: 0.75rem;
+    }
+}

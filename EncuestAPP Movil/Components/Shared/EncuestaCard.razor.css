@@ -1,0 +1,10 @@
+.survey-summary-card h2 { min-width: 0; }
+.survey-summary-description { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.survey-summary-card ::deep .badge { flex-shrink: 0; }
+
+.survey-summary-card { border:1px solid var(--app-color-border)!important; border-radius:20px; overflow:hidden; }
+.survey-summary-card dl { display:grid; grid-template-columns:auto minmax(0,1fr); column-gap:1rem; row-gap:.2rem; padding-block:.75rem; border-top:1px solid var(--app-color-border); }
+.survey-summary-card dd { text-align:right; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+.survey-summary-card ::deep .btn { font-size:.88rem; border-radius:12px; padding:.65rem 1rem; }
+.survey-summary-card ::deep .btn-outline-primary { background:var(--app-color-navy); color:white; }
+.survey-summary-card ::deep .btn-outline-primary:hover { background:var(--app-color-navy-hover); }

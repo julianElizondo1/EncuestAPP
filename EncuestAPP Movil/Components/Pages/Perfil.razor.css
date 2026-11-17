@@ -1,0 +1,7 @@
+
+.profile-identity { display:flex; gap:1rem; align-items:center; padding:1.75rem; margin-bottom:1rem; border-radius:20px; background:var(--app-color-navy); color:#fff; }
+.profile-avatar { display:grid; place-items:center; width:64px; height:64px; flex-shrink:0; border-radius:20px; background:#fcd38b; color:#172554; font-size:1.7rem; font-weight:800; }
+.profile-identity h2 { color:#fff; font-size:1.35rem; overflow-wrap:anywhere; margin:.3rem 0; }
+.profile-identity p { color:#d8e2f5; font-size:.85rem; margin:0; }
+.profile-eyebrow { color:#fcd38b; font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
+@media(max-width:359px) { .profile-identity { padding:1rem; } .profile-avatar { width:48px; height:48px; border-radius:14px; } }

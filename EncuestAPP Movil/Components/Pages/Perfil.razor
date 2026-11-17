@@ -1,0 +1,32 @@
+@page "/perfil"
+@attribute [Authorize]
+@inject ISesionService SesionService
+
+<PageTitle>Perfil | EncuestAPP</PageTitle>
+
+<div class="app-page">
+<EncabezadoPagina Seccion="Cuenta" Titulo="Perfil" Descripcion="Información de tu cuenta de EncuestAPP." />
+
+<div class="profile-identity">
+    <span class="profile-avatar" aria-hidden="true">@(SesionService.Usuario?.Nombre?.Trim().FirstOrDefault().ToString().ToUpperInvariant() ?? "E")</span>
+    <div><span class="profile-eyebrow">Tu espacio de trabajo</span><h2>@(SesionService.Usuario?.Nombre ?? "EncuestAPP")</h2><p>Administración de encuestas</p></div>
+</div>
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+        @if (SesionService.Usuario is { } usuario)
+        {
+            <dl class="row mb-0">
+                <dt class="col-sm-3 text-secondary">Nombre</dt>
+                <dd class="col-sm-9">@usuario.Nombre</dd>
+                <dt class="col-sm-3 text-secondary">Correo electrónico</dt>
+                <dd class="col-sm-9 mb-0">@usuario.Email</dd>
+            </dl>
+            <p class="app-profile-note mb-0">Estos datos corresponden a tu sesión actual.</p>
+        }
+        else
+        {
+            <p class="text-secondary mb-0">No hay datos de usuario disponibles en la sesión actual. Volvé a iniciar sesión para continuar.</p>
+        }
+    </div>
+</div>
+</div>

@@ -1,0 +1,33 @@
+<DialogoModal Titulo="@Titulo" Ocupado="Ocupado" OnClose="OnCancel">
+    <ChildContent><p class="mb-0">@Mensaje</p></ChildContent>
+    <Acciones>
+        <button type="button" class="btn btn-outline-secondary" autofocus @onclick="OnCancel" disabled="@Ocupado">Cancelar</button>
+        <button type="button" class="btn @ClaseConfirmar" @onclick="OnConfirm" disabled="@Ocupado">
+            @if (Ocupado) { <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span> }
+            @TextoConfirmar
+        </button>
+    </Acciones>
+</DialogoModal>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Titulo { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Mensaje { get; set; } = string.Empty;
+
+    [Parameter]
+    public string TextoConfirmar { get; set; } = "Confirmar";
+
+    [Parameter]
+    public string ClaseConfirmar { get; set; } = "btn-primary";
+
+    [Parameter]
+    public bool Ocupado { get; set; }
+
+    [Parameter]
+    public EventCallback OnConfirm { get; set; }
+
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+}

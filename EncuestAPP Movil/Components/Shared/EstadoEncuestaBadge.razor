@@ -1,0 +1,15 @@
+<span class="badge @ClaseCss">@Estado</span>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Estado { get; set; } = string.Empty;
+
+    private string ClaseCss => Estado switch
+    {
+        "Borrador" => "text-bg-secondary",
+        "Publicada" => "text-bg-success",
+        "Cerrada" => "text-bg-dark",
+        "Archivada" => "text-bg-warning",
+        _ => "text-bg-light"
+    };
+}
